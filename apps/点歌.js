@@ -1833,3 +1833,4 @@ async function qqmusic_refresh_token(cookies, type) {
 async function upload_image(file) {
     return (await Bot.pickFriend(Bot.uin)._preprocess(segment.image(file))).imgs[0];
 }
+}
