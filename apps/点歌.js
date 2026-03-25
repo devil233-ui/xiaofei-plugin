@@ -5,7 +5,7 @@ import fetch from "node-fetch";
 import { Config, Data, Version, Plugin_Path } from '../components/index.js';
 import uploadRecord from '../model/uploadRecord.js';
 
-let toSilk
+let toSilk;
 try { toSilk = (await import('../model/toSilk.js')).default; } catch { };
 const no_pic = '';
 var _page_size = 20;
@@ -166,7 +166,6 @@ export class xiaofei_music extends plugin {
             if ((new Date().getTime() - data[key].time) > _music_timeout) {
                 let temp = data[key];
                 delete data[key];
-                // await recallMusicMsg(e, key, temp.msg_results);
             }
         }
         try { await update_qqmusic_ck(); } catch (err) { logger.error(err); }
@@ -299,8 +298,8 @@ async function netease_get_playlist(id, page = 1, page_size = 10) {
         let options = {
             method: 'GET',
             headers: {
-                'User-Agent': 'Mozilla/5.0',
-                'Cookie': music_cookies.netease?.ck || ''
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Cookie': music_cookies.netease?.ck || '' 
             }
         };
         let response = await fetch(url, options);
@@ -308,13 +307,14 @@ async function netease_get_playlist(id, page = 1, page_size = 10) {
         if (res.code == 200 && res.playlist && res.playlist.tracks) {
             let tracks = res.playlist.tracks;
             let start = (page - 1) * page_size;
-            let sliced_tracks = tracks.slice(start, start + page_size);
+            let end = start + page_size;
+            let sliced_tracks = tracks.slice(start, end);
             return {
-                title: res.playlist.name,
+                title: res.playlist.name, 
                 author: res.playlist.creator?.nickname || '未知',
-                desc: res.playlist.description || '',
+                desc: res.playlist.description || '', 
                 page: page,
-                data: sliced_tracks
+                data: sliced_tracks 
             };
         }
     } catch (err) {
@@ -570,7 +570,7 @@ async function music_message(e) {
         reg[3] = arr[index][0] || reg[3];
     } catch (err) { }
     source = [source, reg[3]];
-    if (search == '' && reg[4] != '下一页' && reg[4] != '个性电台' && reg[4] != '每日推荐' && reg[4] != '每日30首' && reg[4] != '日推' && !((reg[4] == '来首' || reg[4] == '放首') && search == '歌') && reg[4] != '我的收藏' && reg[4] != '我喜欢的歌') {
+    if (search == '' && !['下一页', '个性电台', '每日推荐', '每日30首', '日推', '我的收藏', '我喜欢的歌'].includes(reg[4]) && !((reg[4] == '来首' || reg[4] == '放首') && search == '歌')) {
         let help = "------点歌说明------\r\n格式：#点歌 #多选点歌\r\n支持：QQ、网易、酷我、酷狗\r\n例如：#QQ点歌 #多选QQ点歌"
         await e.reply(help, true);
         return true;
@@ -585,11 +585,11 @@ async function music_message(e) {
         search = e.user_id; source = ['qq_radio', '个性电台']; page = 0; page_size = 5;
         if (reg[4].includes('首')) page_size = 1; else e.reply('请稍候。。。', true);
     }
-    if (reg[4] == '每日推荐' || reg[4] == '每日30首' || reg[4] == '日推') {
+    if (['每日推荐', '每日30首', '日推'].includes(reg[4])) {
         if (search != '') return true;
         search = e.user_id; source = ['qq_DailyRecommend', '每日推荐']; page = 0; page_size = 30; e.reply('请稍候。。。', true);
     }
-    if (reg[4] == '我的收藏' || reg[4] == '我喜欢的歌') {
+    if (['我的收藏', '我喜欢的歌'].includes(reg[4])) {
         let page_reg = /^\d+$/.exec(search);
         if (search != '' && !page_reg) return true;
         search = e.user_id; source = ['qq_like', '收藏']; page = (!page_reg ? 1 : parseInt(page_reg[0])); page_size = page == 0 ? 30 : _page_size; e.reply('请稍候。。。', true);
@@ -605,61 +605,81 @@ async function music_message(e) {
 
 async function music_handle(e, search, source, page = 0, page_size = 10, temp_data = {}) {
     let result;
+    
     let is_qq_source = (source[0] == 'qq' || source[0] == 'qq_playlist');
     let is_netease_source = (source[0] == 'netease');
     let is_playlist_mode = false; 
+
     let qq_id = get_qqmusic_id(search);
     if (qq_id && is_qq_source) {
+        logger.info(`[小飞点歌] 识别到QQ歌单ID: ${qq_id}`);
         result = await qqmusic_getdiss(0, qq_id, 0, page == 0 ? 1 : page, page_size);
         if (result?.data?.length > 0) {
             source = ['qq', 'QQ歌单'];
             is_playlist_mode = true;
+            result.data = result.data.map(item => item); 
         }
     }
+
     if (!result) {
         let wy_id = get_netease_id(search);
-        if (search.includes('163.com') || search.includes('music.163')) { is_netease_source = true; source = ['netease', '网易云音乐']; }
+        if (search.includes('163.com') || search.includes('music.163')) {
+            is_netease_source = true;
+            source = ['netease', '网易云音乐'];
+        }
         if (wy_id && is_netease_source) {
+            logger.info(`[小飞点歌] 识别到网易云歌单ID: ${wy_id}`);
             result = await netease_get_playlist(wy_id, page == 0 ? 1 : page, page_size);
-            if (result?.data?.length > 0) { source = ['netease', '网易歌单']; is_playlist_mode = true; }
+            if (result?.data?.length > 0) {
+                source = ['netease', '网易歌单'];
+                is_playlist_mode = true;
+            }
         }
     }
+
     if (!result) {
         result = await music_search(e, search, source[0], page == 0 ? 1 : page, page_size);
         if (result && result.source && result.source !== source[0]) {
             source = [result.source, SOURCE_NAME_MAP[result.source] || result.source];
         }
     }
+
     if (result && result.data && result.data.length > 0) {
         let key = get_MusicListId(e);
         let data = xiaofei_plugin.music_temp_data;
         let temp = data[key];
         if (temp?.msg_results && (temp?.search != search || temp?.source[0] != source[0] || page < 2 || !temp_data?.data)) {
             delete data[key];
-            await recallMusicMsg(e, key, temp.msg_results);
         }
         data = {};
+
         if (page > 0 && result.data.length > 1) {
             page = result.page;
+            
             if (is_playlist_mode && page === 1) {
                 await e.reply(`正在为您加载歌单\n━━━━━━━━━━━━\n📄 歌单：${result.title}\n👤 作者：${result.author || '未知'}`);
             }
+
             let title = (is_playlist_mode) ? source[1] : (source[1] + '点歌列表');
             if (result.title) title = result.title;
             if (result.data.length >= page_size || page > 1) title += `[第${page}页]`;
+            
             let msg_result = [];
             if (e.guild_id) msg_result.push(e.reply(ShareMusic_TextList(e, result.data, page, page_size, title)));
-            else msg_result.push(new Promise(async (resolve) => { resolve(await e.reply(await ShareMusic_HtmlList(e, result.data, page, page_size, title))); }));
+            else msg_result.push(new Promise(async (resolve, reject) => { resolve(await e.reply(await ShareMusic_HtmlList(e, result.data, page, page_size, title))); }));
+
             if (page > 1) {
-                let list_data = (temp_data.data || []).concat(result.data);
-                let msg_results = (temp_data.msg_results || []).concat([msg_result]);
-                data = { time: new Date().getTime(), data: list_data, page: result.page, msg_results: msg_results, search: search, source: source, index: -1, start_index: temp_data.start_index };
+                let list_data = temp_data.data || [];
+                list_data = list_data.concat(result.data);
+                let msg_results = temp_data.msg_results || [];
+                msg_results.push(msg_result);
+                data = { time: new Date().getTime(), data: list_data, page: result.page, msg_results: msg_results, search: search, source: source, index: -1, start_index: !temp_data.data ? (page * page_size) - page_size : temp_data.start_index };
             } else {
                 data = { time: new Date().getTime(), data: result.data, page: result.page, msg_results: [msg_result], search: search, source: source, index: -1, start_index: 0 };
             }
         } else {
             if (['qq_radio', 'qq_recommend', 'qq_like', 'qq_DailyRecommend'].includes(source[0])) {
-                 let nickname = e.sender.nickname || e.user_id;
+                 let title, nickname = e.sender.nickname || e.user_id;
                  if (e.isGroup) {
                     try {
                         let info = await e.bot?.getGroupMemberInfo(e.group_id, e.user_id);
@@ -667,36 +687,57 @@ async function music_handle(e, search, source, page = 0, page_size = 10, temp_da
                     } catch (err) {
                         let info = e.bot.pickMember(e.group_id, e.user_id);
                         nickname = info?.info?.card || info?.info?.nickname;
-                    }
+                    } finally { nickname = e.sender.nickname || e.user_id; }
                 }
+                let user_info = { nickname: nickname, user_id: e.user_id };
+
+                switch (source[0]) {
+                    case 'qq_radio': title = `根据${nickname}的听歌口味推荐`; break;
+                    case 'qq_like': title = `${nickname}的收藏`; break;
+                    case 'qq_DailyRecommend': default: title = result.title; break;
+                }
+
                 let MsgList = [];
                 let index = 1;
                 let tag = 'QQ音乐' + source[1];
                 if (result.data.length > 1) {
-                    if (result.desc) MsgList.push({ nickname, user_id: e.user_id, message: result.desc });
+                    if (result.desc) MsgList.push({ ...user_info, message: result.desc });
                     for (let music of result.data) {
                         let music_json = await CreateMusicShareJSON({ ...music });
-                        music_json.meta.music.tag = index + '.' + tag;
-                        MsgList.push({ nickname, user_id: e.user_id, message: Version.isTrss ? { type: "json", data: music_json } : segment.json(music_json) });
+                        music = music_json.meta.music;
+                        music.tag = index + '.' + tag;
+                        if (Version.isTrss) MsgList.push({ ...user_info, message: { type: "json", data: music_json } });
+                        else MsgList.push({ ...user_info, message: segment.json(music_json) });
                         index++;
                     }
+                    const friend = (e.bot || Bot)?.pickFriend(e.bot.uin || e.self_id || Bot.uin);
                     let forwardMsg = await Bot.makeForwardMsg(MsgList);
+                    if (friend?.uploadLongMsg) { try { forwardMsg = await friend.uploadLongMsg(forwardMsg); } catch { } }
                     await e.reply(forwardMsg);
                     data = { time: new Date().getTime() + (1000 * 60 * 27), data: result.data, page: 0, msg_results: [], search: search, source: source, index: -1, start_index: 0 };
                 } else {
+                    if (source[0] == 'qq_radio') {
+                        tag = nickname.length > 6 ? (nickname.substring(0, 6) + '...') : nickname;
+                        tag = `${tag}的个性电台`;
+                    }
                     let music = result.data[0];
-                    await SendMusicShare(e, await CreateMusicShare(e, music), music);
+                    music.name = `${music.name}-${music.artist}`;
+                    music.artist = tag;
+                    let body = await CreateMusicShare(e, music);
+                    await SendMusicShare(e, body, music);
                     data = { time: new Date().getTime(), data: [result.data[0]], page: 0, msg_results: [], search: search, source: source, index: 0, start_index: 0 };
                 }
             } else {
                 let music = result.data[0];
                 data = { time: new Date().getTime(), data: [music], page: 0, msg_results: [], search: search, source: source, index: 0, start_index: 0 };
-                await SendMusicShare(e, await CreateMusicShare(e, music), music);
+                let body = await CreateMusicShare(e, music);
+                await SendMusicShare(e, body, music);
             }
         }
         xiaofei_plugin.music_temp_data[get_MusicListId(e)] = data;
     } else {
-        await e.reply(page > 1 ? '⚠️ 没有找到更多歌曲！' : '⚠️ 未找到匹配的歌曲！', true, { recallMsg: 10 });
+        if (page > 1) await e.reply('⚠️ 没有找到更多歌曲！', true, { recallMsg: 10 });
+        else await e.reply(((source[0].includes('radio') || source[0].includes('recommend')) ? '⚠️ 获取推荐歌曲失败，请重试！' : '⚠️ 抱歉，平台未返回匹配的歌曲！'), true, { recallMsg: 15 });
     }
     return true;
 }
@@ -706,60 +747,126 @@ function ShareMusic_TextList(e, list, page, page_size, title = '') {
     let message = [`---${title}---`];
     for (let i in list) {
         let music = list[i];
-        let index = (page > 1) ? (((page - 1) * page_size) + Number(i) + 1) : (Number(i) + 1);
+        let index = Number(i) + 1;
+        if (page > 1) index = ((page - 1) * page_size) + index;
         message.push(index + '.' + music.name + '-' + music.artist);
     }
-    message.push('----------------\n提示：直接发送序号点歌' + (next_page ? '，发送【#下一页】' : '') + '！');
+    message.push('----------------');
+    message.push('提示：请直接（勿回复）发送序号进行点歌' + (next_page ? '，发送【#下一页】查看更多' : '') + '！');
     return message.join('\n');
+}
+
+function ShareMusic_JSONList(e, list, page, page_size, title = '') {
+    let next_page = (page > 0 && list.length >= page_size) ? true : false;
+    let json = {
+        "app": "com.tencent.bot.task.deblock",
+        "config": { "autosize": 1, "type": "normal", "showSender": 0 },
+        "meta": {
+            "detail": {
+                "appID": "", "battleDesc": "", "botName": "Yunzai-Bot", "cmdList": [], "cmdTitle": "可直接（勿回复）发送以下指令:",
+                "content": "", "guildID": "", "iconLeft": [], "iconRight": [], "receiverName": "@小飞", "subGuildID": "SUBGUILDID#", "title": "", "titleColor": ""
+            }
+        },
+        "prompt": "", "ver": "2.0.4.0", "view": "index"
+    };
+    json.prompt = `${title}`;
+    json.meta.detail.receiverName = `@${e.nickname}`;
+    json.meta.detail.title = `---${title}---`;
+    let music_list = [];
+    for (let i in list) {
+        let music = list[i];
+        let index = Number(i) + 1;
+        if (page > 1) index = ((page - 1) * page_size) + index;
+        music_list.push(`${index}.${music.name}-${music.artist}`);
+    }
+    json.meta.detail.content = music_list.join("\n");
+    let cmdList = json.meta.detail.cmdList;
+    cmdList.push({ "cmdDesc": "进行点歌", "cmd": " 歌曲序号", "cmdTitle": "发送" });
+    if (next_page) cmdList.push({ "cmdDesc": "查看更多", "cmd": " #下一页", "cmdTitle": "发送" });
+    cmdList.push({ "cmdDesc": "查看歌词", "cmd": " #歌词+序号", "cmdTitle": "发送" });
+    cmdList.push({ "cmdDesc": "播放语音", "cmd": " #(高清)语音+序号", "cmdTitle": "发送" });
+    return { data: json };
 }
 
 async function ShareMusic_HtmlList(e, list, page, page_size, title = '') {
     let next_page = (page > 0 && list.length >= page_size) ? true : false;
-    let start = Date.now();
-    let new_list = list.map((music, i) => ({ index: (page > 1) ? ((page - 1) * page_size + i + 1) : (i + 1), name: music.name, artist: music.artist }));
+    let start = Date.now()
+    let new_list = [];
+    for (let i in list) {
+        let music = list[i];
+        let index = Number(i) + 1;
+        if (page > 1) index = ((page - 1) * page_size) + index;
+        new_list.push({ index: index, name: music.name, artist: music.artist });
+    }
     let saveId = String(new Date().getTime());
     let dir = `data/html/xiaofei-plugin/music_list`;
     Data.createDir(dir, 'root');
+    let _background_path = `${Plugin_Path}/resources/html/music_list/bg/default.jpg`;
     let background_path = '';
     let background_url = await get_background();
     if (background_url) {
         try {
             let response = await fetch(background_url);
             let buffer = Buffer.from(await response.arrayBuffer());
-            let file = `${process.cwd()}/${dir}/${saveId}.jpg`;
-            fs.writeFileSync(file, buffer);
-            background_path = file;
+            if (buffer) {
+                let file = `${process.cwd()}/${dir}/${saveId}.jpg`;
+                fs.writeFileSync(file, buffer);
+                background_path = file;
+            }
         } catch (err) { }
     }
-    let data = { plugin_path: Plugin_Path, background_path: background_path || `${Plugin_Path}/resources/html/music_list/bg/default.jpg`, title: `${title.split('').join(' ')}`, tips: '直接发送序号点歌' + (next_page ? '，#下一页' : '') + '！', sub_title: `Created By ${Version.BotName} ${Version.yunzai} & xiaofei-Plugin ${Version.ver}`, list: new_list };
-    let img = await xiaofei_plugin.puppeteer.screenshot("xiaofei-plugin/music_list", { saveId, tplFile: `${Plugin_Path}/resources/html/music_list/index.html`, data, imgType: 'jpeg', quality: 80 });
-    setTimeout(() => { fs.unlink(`${process.cwd()}/${dir}/${saveId}.html`, () => { }); if (background_path) fs.unlink(background_path, () => { }); }, 100);
-    logger.mark(`[小飞插件_列表图生成]${logger.green(`${Date.now() - start}ms`)}`);
-    return (img && img?.type != 'image') ? segment.image(img) : img;
+    let data = {
+        plugin_path: Plugin_Path,
+        background_path: background_path || _background_path,
+        title: `${title.split('').join(' ')}`,
+        tips: '请直接（勿回复）发送序号进行点歌' + (next_page ? '，发送【#下一页】查看更多' : '') + '！',
+        sub_title: `Created By ${Version.BotName} ${Version.yunzai} & xiaofei-Plugin ${Version.ver}`,
+        list: new_list,
+    };
+    let img = await xiaofei_plugin.puppeteer.screenshot("xiaofei-plugin/music_list", {
+        saveId: saveId,
+        tplFile: `${Plugin_Path}/resources/html/music_list/index.html`,
+        data: data,
+        imgType: 'jpeg',
+        quality: 80
+    });
+    setTimeout(() => {
+        fs.unlink(`${process.cwd()}/${dir}/${saveId}.html`, err => { });
+        if (background_path) fs.unlink(background_path, err => { });
+    }, 100);
+    logger.mark(`[小飞插件_点歌列表图片生成耗时]${logger.green(`${Date.now() - start}ms`)}`);
+    if (img && img?.type != 'image') img = segment.image(img);
+    return img;
 }
 
 function get_MusicListId(e) {
-    if (e.guild_id) return `guild_${e.channel_id}_${e.guild_id}_${e.self_id}`;
-    if (e.group) return `group_${e.group?.gid || e.group.id}_${e.user_id}_${e.self_id}`;
-    return `friend_${e.user_id}_${e.self_id}`;
+    let id = '';
+    if (e.guild_id) id = `guild_${e.channel_id}_${e.guild_id}_${e.self_id}`;
+    else if (e.group) id = `group_${e.group?.gid || e.group.id}_${e.user_id}_${e.self_id}`;
+    else id = `friend_${e.user_id}_${e.self_id}`;
+    return `${id}`;
 }
 
 async function get_background() {
-    let background_temp = xiaofei_plugin.background_temp;
-    if (background_temp && (new Date().getTime() - background_temp.time) < 1000 * 60 * 360) {
-        let list = background_temp.data.data.list;
-        let ext = list[random(0, list.length - 1)].ext[0];
-        return ext.value[random(0, ext.value.length - 1)].url;
-    }
+    let background_url = '';
+    let api = 'https://content-static.mihoyo.com/content/ysCn/getContentList?channelId=313&pageSize=1000&pageNum=1&isPreview=0';
     try {
-        let res = await (await fetch('https://content-static.mihoyo.com/content/ysCn/getContentList?channelId=313&pageSize=1000&pageNum=1&isPreview=0')).json();
+        let response;
+        let res;
+        let background_temp = xiaofei_plugin.background_temp;
+        if (background_temp && (new Date().getTime() - background_temp.time) < 1000 * 60 * 360) res = background_temp.data;
+        else {
+            response = await fetch(api);
+            res = await response.json();
+        }
         if (res.retcode == 0 && res.data?.list) {
-            xiaofei_plugin.background_temp = { data: res, time: new Date().getTime() };
-            let ext = res.data.list[random(0, res.data.list.length - 1)].ext[0];
-            return ext.value[random(0, ext.value.length - 1)].url;
+            if (response) xiaofei_plugin.background_temp = { data: res, time: new Date().getTime() };
+            let list = res.data.list;
+            let data = list[random(0, list.length - 1)].ext[0];
+            if (data.value && data.value.length > 0) background_url = data.value[random(0, data.value.length - 1)].url;
         }
     } catch (err) { }
-    return '';
+    return background_url;
 }
 
 async function music_search(e, search, source, page = 1, page_size = 10) {
@@ -767,9 +874,15 @@ async function music_search(e, search, source, page = 1, page_size = 10) {
     let result = [];
     let setting = Config.getdefSet('setting', 'system') || {};
     let music_high_quality = setting['music_high_quality'];
-    let is_text_search = false;
-    const blacklist = ['鸣潮先约'];
     
+    // 【完美修复】还原这个变量，保证不出 ReferenceError
+    let is_text_search = false;
+
+    // 【新增】黑名单配置：包含你之前设定的特定黑名单
+    const blacklist = [
+        '鸣潮先约'
+    ];
+
     let value = {
         netease: {
             name: 'name', id: 'id',
@@ -1011,37 +1124,85 @@ async function music_search(e, search, source, page = 1, page_size = 10) {
     }
 
     if ((!result || !result.data || result.data.length == 0) && is_text_search) {
-        const fallback = [{ id: 'netease', name: '网易云', fn: netease_search }, { id: 'kuwo', name: '酷我音乐', fn: kuwo_search }, { id: 'bilibili', name: 'Bilibili', fn: bilibili_search }];
-        for (let p of fallback) {
-            await e.reply(`QQ未找到，切换至[${p.name}]...`, true, { recallMsg: 2 });
-            try { let res = await p.fn(search, page, page_size); if (res?.data?.length > 0) { result = res; source = p.id; break; } } catch (err) {}
-            await sleep(800);
+        const fallback_list = [
+            { id: 'netease', name: '网易云', fn: netease_search },
+            { id: 'kuwo', name: '酷我音乐', fn: kuwo_search },
+            { id: 'bilibili', name: 'Bilibili', fn: bilibili_search },
+            { id: 'kugou', name: '酷狗音乐', fn: kugou_search },
+        ];
+        for (let platform of fallback_list) {
+            let tip_msg = `QQ音乐未找到，正在切换至 [${platform.name}] 搜索...`;
+            logger.warn(`[小飞点歌] ${tip_msg}`);
+            let msg_res = await e.reply(tip_msg, true, { recallMsg: 2000 });
+            try {
+                let res = await platform.fn(search, page, page_size);
+                if (res && res.data && res.data.length > 0) {
+                    result = res;
+                    source = platform.id;
+                    e.reply(`已为您切换至 [${platform.name}]`, true);
+                    break;
+                }
+            } catch (err) { logger.error(`[小飞点歌] 切换 ${platform.name} 搜索出错: ${err}`); }
+            await sleep(1000);
         }
     }
 
-    if (result?.data?.length > 0) {
-        for (let data of result.data) {
-            let s_val = value[source];
-            let name = typeof s_val.name == 'function' ? await s_val.name(data) : data[s_val.name];
-            let artist = typeof s_val.artist == 'function' ? await s_val.artist(data) : data[s_val.artist];
-            let isBlack = blacklist.some(kw => (name + artist).toLowerCase().includes(kw.toLowerCase()));
-            if (!isBlack) list.push({ id: data[s_val.id] || name, name, artist, pic: s_val.pic, link: s_val.link, url: s_val.url, lrc: s_val.lrc, source, data, api: s_val.api });
+    if (result && result.data && result.data.length > 0) {
+        page = result.page;
+        let result_data = result.data;
+        for (let i in result_data) {
+            let data = result_data[i];
+            let name = value[source].name; name = typeof (name) == 'function' ? await name(data) : data[name];
+            let id = data[value[source].id]; if (source == 'kuwo') { id = id.substring(6); }
+            let artist = value[source].artist; artist = typeof (artist) == 'function' ? await artist(data) : data[artist];
+            let pic = value[source].pic; pic = typeof (pic) == 'function' ? pic/*await pic(data)*/ : data[pic];
+            let link = value[source].link; link = typeof (link) == 'function' ? link(data) : data[link];
+            let url = value[source].url; url = typeof (url) == 'function' ? url/*await url(data)*/ : data[url];
+            let lrc = value[source].lrc; lrc = typeof (lrc) == 'function' ? lrc/*await lrc(data)*/ : data[lrc];
+            list.push({ id: id, name: name, artist: artist, pic: pic, link: link, url: url, lrc: lrc, source: source, data: data, api: value[source].api });
         }
-        if (list.length > 1 && search) {
-            let kw = search.replace(/\s/g, '').toLowerCase();
-            const prio = ['HOYO-MiX', '米哈游', 'Mihoyo', '三Z-STUDIO', '陈致逸'];
-            list.sort((a, b) => {
-                let hasA = a.name.toLowerCase().includes(kw), hasB = b.name.toLowerCase().includes(kw);
-                if (hasA && !hasB) return -1; if (!hasA && hasB) return 1;
-                if (hasA && hasB) {
-                    let pA = prio.some(p => a.artist.includes(p)), pB = prio.some(p => b.artist.includes(p));
-                    if (pA && !pB) return -1; if (!pA && pB) return 1;
+
+        if (list.length > 0) {
+            list = list.filter(item => {
+                let matchText = String(item.name + ' ' + item.artist).toLowerCase();
+                for (let kw of blacklist) {
+                    if (matchText.includes(kw.toLowerCase())) {
+                        return false; 
+                    }
                 }
-                return 0;
+                return true; 
+            });
+        }
+
+        if (list.length > 1 && search) {
+            let keyword = String(search).replace(/\s/g, '').toLowerCase();
+            const priority_artists = ['HOYO-MiX', '米哈游', 'Mihoyo', '三Z-STUDIO', '陈致逸'];
+
+            list.sort((a, b) => {
+                let nameA = String(a.name).replace(/\s/g, '').toLowerCase();
+                let nameB = String(b.name).replace(/\s/g, '').toLowerCase();
+                let artistA = String(a.artist);
+                let artistB = String(b.artist);
+                
+                let hasA = nameA.includes(keyword);
+                let hasB = nameB.includes(keyword);
+                
+                if (hasA && !hasB) return -1;
+                if (!hasA && hasB) return 1;
+
+                if (hasA && hasB) {
+                    let isPriorA = priority_artists.some(pa => artistA.includes(pa));
+                    let isPriorB = priority_artists.some(pa => artistB.includes(pa));
+                    
+                    if (isPriorA && !isPriorB) return -1;
+                    if (!isPriorA && isPriorB) return 1; 
+                }
+                return 0; 
             });
         }
     }
-    return { title: result?.title, author: result?.author, desc: result?.desc, page: result?.page || page, data: list, source };
+    
+    return { title: result?.title, author: result?.author, desc: result?.desc, page: result?.page || page, data: list, source: source };
 }
 
 async function CreateMusicShareJSON(data) {
@@ -1068,7 +1229,7 @@ async function CreateMusicShare(e, data) {
     }
     const apps = { bilibili: [100951776, 'tv.danmaku.bili', '7194d531cbe7960a22007b9f6bdaa38b'], netease: [100495085, 'com.netease.cloudmusic', 'da6b069da1e2982db3e386233f68d76d'], kuwo: [100243533, 'cn.kuwo.player', 'bf9ff4ffb4c558a34ee3fd52c223ebf5'], kugou: [205141, 'com.kugou.android', 'fe4a24d80fcf253a00676a808f62c2c6'], qq: [100497308, 'com.tencent.qqmusic', 'cbd27cd7c861227d013a25b2d10f0799'] };
     let [appid, appname, appsign] = apps[data.source] || apps.qq;
-    return { 1: appid, 2: 1, 3: audio ? 4 : 0, 5: { 1: 1, 2: "0.0.0", 3: appname, 4: appsign }, 10: e.isGroup ? 1 : 0, 11: e.isGroup ? e.group.gid : (e.friend.uin || e.user_id), 12: { 10: data.name, 11: data.artist, 12: `[分享]${data.name}`, 13: url, 14: image, 16: audio } };
+    return { 1: appid, 2: 1, 3: audio ? 4 : 0, 5: { 1: 1, 2: "0.0.0", 3: appname, 4: appsign }, 10: e.isGroup ? 1 : 0, 11: e.isGroup ? e.group.gid : (e.friend?.uin || e.user_id), 12: { 10: data.name, 11: data.artist, 12: `[分享]${data.name}`, 13: url, 14: image, 16: audio } };
 }
 
 async function SendMusicShare(e, body, music) {
@@ -1077,38 +1238,36 @@ async function SendMusicShare(e, body, music) {
         return await SendMediaCardInstead(e, music);
     }
     let sendSuccess = false;
-    let failReason = "";
 
     try {
         if (e.bot?.adapter === 'OneBotv11' || e.bot?.adapter?.name === 'OneBotv11') {
             try {
                 let ret = await e.reply(body);
-                if (ret && (ret.status === 'failed' || ret.retcode !== 0)) throw new Error(ret.message || ret.wording || "发送返回失败状态");
+                if (ret && (ret.status === 'failed' || ret.retcode !== 0)) throw new Error("SF");
                 sendSuccess = true;
             } catch (err) {
                 sendSuccess = false;
-                failReason = `OneBot发送报错: ${err.message || err}`;
             }
         } else if (e.bot.sendOidb) {
             let payload = await e.bot.sendOidb("OidbSvc.0xb77_9", core.pb.encode(body));
             let result = core.pb.decode(payload);
             if (result[3] == 0) sendSuccess = true;
-            else { sendSuccess = false; failReason = `Oidb错误码: ${result[3]}`; }
+            else sendSuccess = false;
         } else {
-            sendSuccess = false; failReason = "协议不支持";
+            sendSuccess = false;
         }
-    } catch (err) { sendSuccess = false; failReason = err.message; }
+    } catch (err) { sendSuccess = false; }
 
     if (sendSuccess) return true;
 
     if (!music || !music.url) return false;
 
-    // ===== 【完美分离逻辑】 =====
     try {
-        // 1. 先发物理兜底链接，【不撤回】，让用户随时有备用选项
+        // 【完美分离逻辑】
+        // 1. 发物理兜底链接，不撤回
         await e.reply(`卡片发送失败，已提取备用链接：\n━━━━━━━━━━━━\n歌名：${music.name}\n歌手：${music.artist}\n链接：${music.link || music.url}`);
 
-        // 2. 再发防傻等提示，【自动撤回】，保持群聊清爽
+        // 2. 发防傻等提示，撤回
         await e.reply(`正在尝试转为语音模式(可能需1-3分钟)，请稍候...`, true, { recallMsg: 45 });
 
         let msgRes;
@@ -1158,493 +1317,65 @@ async function SendMediaCardInstead(e, music) {
     } catch (err) { return false; }
 }
 
-async function get_qqmusic_userinfo(ck = null) {
-	try {
-		let url = `https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?_=${new Date().getTime()}&cv=4747474&ct=24&format=json&inCharset=utf-8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0&uin=0&g_tk_new_20200303=5381&g_tk=5381&cid=205360838&userid=0&reqfrom=1&reqtype=0&hostUin=0&loginUin=0`;
-		let cookies = getCookie(ck) || getCookie(music_cookies.qqmusic.ck) || [];
-
-		let options = {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				'Cookie': cookies.join('; ')
-			}
-		};
-
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json();
-		if (res?.code == '0' && res.data?.creator) {
-			let creator = res.data.creator;
-			return {
-				code: 1, data: {
-					userid: ck.get('uin') || ck.get('wxuin'),
-					nickname: creator.nick,
-					is_vip: await is_qqmusic_vip(ck.get('uin') || ck.get('wxuin'), cookies.join('; '))
-				}
-			};
-		}
-	} catch (err) { }
-	return { code: -1 };
-}
-
-async function is_qqmusic_vip(uin, cookies = null) {
-	let json = {
-		"comm": { "cv": 4747474, "ct": 24, "format": "json", "inCharset": "utf-8", "outCharset": "utf-8", "notice": 0, "platform": "yqq.json", "needNewCode": 1, "uin": 0, "g_tk_new_20200303": 5381, "g_tk": 5381 },
-		"req_0": {
-			"module": "userInfo.VipQueryServer",
-			"method": "SRFVipQuery_V2",
-			"param": {
-				"uin_list": [uin]
-			}
-		}
-	};
-	let options = {
-		method: 'POST',//post请求 
-		headers: {
-			'Content-Type': 'application/x-www-form-urlencoded',
-			'Cookie': cookies || Bot?.cookies?.['y.qq.com']
-		},
-		body: JSON.stringify(json)
-	};
-
-	let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-	try {
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json();
-		if (res.req_0 && res.req_0?.code == '0') {
-			let data = res.req_0.data?.infoMap?.[uin];
-			if (data.iVipFlag == 1 || data.iSuperVip == 1 || data.iNewVip == 1 || data.iNewSuperVip == 1) {
-				return true;
-			}
-		}
-	} catch (err) { }
-	return false;
-}
-
-async function kugou_search(search, page = 1, page_size = 10) {
-	try {
-		let url = `http://msearchcdn.kugou.com/api/v3/search/song?page=${page}&pagesize=${page_size}&keyword=${encodeURI(search)}`;
-		let response = await fetch(url, { method: "get" }); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-		if (!res.data || res.data.info < 1) {
-			return [];
-		}
-		return { page: page, data: res.data.info };
-	} catch (err) { }
-
-	return null;
-}
-
-
-async function qqmusic_refresh_token(cookies, type) {
-	let result = { code: -1 };
-	let json_body = {
-		...music_cookies.qqmusic.body,
-		req_0: {
-			"method": "Login",
-			"module": "music.login.LoginServer",
-			"param": {
-				"access_token": "",
-				"expired_in": 0,
-				"forceRefreshToken": 0,
-				"musicid": 0,
-				"musickey": "",
-				"onlyNeedAccessToken": 0,
-				"openid": "",
-				"refresh_token": "",
-				"unionid": ""
-			}
-		}
-	};
-	let req_0 = json_body.req_0;
-	if (type == 0) {
-		req_0.param.appid = 100497308;
-		req_0.param.access_token = cookies.get("psrf_qqaccess_token") || '';
-		req_0.param.musicid = Number(cookies.get("uin") || '0');
-		req_0.param.openid = cookies.get("psrf_qqopenid") || '';
-		req_0.param.refresh_token = cookies.get("psrf_qqrefresh_token") || '';
-		req_0.param.unionid = cookies.get("psrf_qqunionid") || '';
-	} else if (type == 1) {
-		req_0.param.strAppid = "wx48db31d50e334801";
-		req_0.param.access_token = cookies.get("wxaccess_token") || '';
-		req_0.param.str_musicid = cookies.get("wxuin") || '0';
-		req_0.param.openid = cookies.get("wxopenid") || '';
-		req_0.param.refresh_token = cookies.get("wxrefresh_token") || '';
-		req_0.param.unionid = cookies.get("wxunionid") || '';
-	} else {
-		return result;
-	}
-	req_0.param.musickey = (cookies.get("qqmusic_key") || cookies.get("qm_keyst")) || '';
-
-	let options = {
-		method: 'POST',//post请求 
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: JSON.stringify(json_body)
-	};
-
-	let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-	try {
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-		if (res.req_0?.code == '0') {
-			let map = new Map();
-			let data = res.req_0?.data;
-			if (type == 0) {
-				map.set("psrf_qqopenid", data.openid);
-				map.set("psrf_qqrefresh_token", data.refresh_token);
-				map.set("psrf_qqaccess_token", data.access_token);
-				map.set("psrf_access_token_expiresAt", data.expired_at);
-				map.set("uin", String(data.str_musicid || data.musicid) || '0');
-				map.set("qqmusic_key", data.musickey);
-				map.set("qm_keyst", data.musickey);
-				map.set("psrf_musickey_createtime", data.musickeyCreateTime);
-				map.set("psrf_qqunionid", data.unionid);
-				map.set("euin", data.encryptUin);
-				map.set("login_type", 1);
-				map.set("tmeLoginType", 2);
-				result.code = 1;
-				result.data = map;
-			} else if (type == 1) {
-				map.set("wxopenid", data.openid);
-				map.set("wxrefresh_token", data.refresh_token);
-				map.set("wxaccess_token", data.access_token);
-				map.set("wxuin", String(data.str_musicid || data.musicid) || '0');
-				map.set("qqmusic_key", data.musickey);
-				map.set("qm_keyst", data.musickey);
-				map.set("psrf_musickey_createtime", data.musickeyCreateTime);
-				map.set("wxunionid", data.unionid);
-				map.set("euin", data.encryptUin);
-				map.set("login_type", 2);
-				map.set("tmeLoginType", 1);
-				result.code = 1;
-				result.data = map;
-			}
-		}
-	} catch (err) {
-		logger.error(err);
-	}
-	return result;
-}
-
-async function qqmusic_GetTrackInfo(ids) {
-	try {
-		let json_body = {
-			...JSON.parse(JSON.stringify(music_cookies.qqmusic.body)),
-			"req_0": { "module": "track_info.UniformRuleCtrlServer", "method": "GetTrackInfo", "param": {} }
-		};
-		let types = [];
-		for (let i in ids) {
-			ids[i] = parseInt(ids[i]);
-			types.push(200);
-		}
-		json_body.req_0.param = {
-			ids: ids,
-			types: types
-		};
-		let options = {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: JSON.stringify(json_body)
-		};
-
-		let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-		let response = await fetch(url, options);
-		let res = await response.json();
-
-		if (res.code != '0' && res.req_0.code != '0') {
-			return null;
-		}
-
-		let data = res.req_0?.data?.tracks;
-		data = data ? data : [];
-		return { page: 0, data: data };
-	} catch (err) { }
-	return null;
-}
-
-async function qqmusic_recommend(uin, page_size) {
-	try {
-		let json_body = {
-			"comm": { "g_tk": 5381, "uin": uin, "format": "json", "ct": 20, "cv": 1803, "platform": "wk_v17" },
-			"req_0": { "module": "recommend.RecommendFeedServer", "method": "get_recommend_feed", "param": { "direction": 1, "page": 1, "v_cache": [], "v_uniq": [], "s_num": 0 } }
-		};
-		json_body.comm.guid = md5(String(new Date().getTime()));
-		json_body.comm.uin = uin;
-		json_body.comm.tmeLoginType = 2;
-		json_body.comm.psrf_qqunionid = '';
-		json_body.comm.authst = '';
-		let options = {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: JSON.stringify(json_body)
-		};
-
-		let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-		let response = await fetch(url, options);
-		let res = await response.json();
-
-		if (res.code != '0' && res.req_0.code != '0') {
-			return null;
-		}
-		let v_card = [];
-		for (let v_shelf of res.req_0?.data?.v_shelf) {
-			if (v_shelf.style == 1) {
-				for (let v_niche of v_shelf.v_niche) {
-					v_card = v_card.concat(v_niche.v_card);
-				}
-			}
-		}
-
-		let ids = [];
-		for (let val of v_card) {
-			if (ids.length >= page_size) break;
-			ids.push(val.id);
-		}
-
-		return await qqmusic_GetTrackInfo(ids);
-	} catch (err) { }
-	return null;
-}
-
-async function qqmusic_radio(uin, page_size) {
-	try {
-		let json_body = {
-			...JSON.parse(JSON.stringify(music_cookies.qqmusic.body)),
-			"req_0": { "method": "get_radio_track", "module": "pc_track_radio_svr", "param": { "id": 99, "num": 1 } }
-		};
-		json_body.comm.guid = md5(String(new Date().getTime()));
-		json_body.comm.uin = uin;
-		json_body.comm.tmeLoginType = 2;
-		json_body.comm.psrf_qqunionid = '';
-		json_body.comm.authst = '';
-		json_body.req_0.param.num = page_size;
-
-		let options = {
-			method: 'POST',//post请求 
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: JSON.stringify(json_body)
-		};
-
-		let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-
-		if (res.code != '0' && res.req_0.code != '0') {
-			return null;
-		}
-
-		let data = res.req_0?.data?.tracks;
-		data = data ? data : [];
-		return { page: 0, data: data };
-	} catch (err) { }
-
-	return null;
-}
-
-async function qqmusic_getdiss(uin = 0, disstid = 0, dirid = 202, page = 1, page_size = 30) {
-	try {
-		let json_body = {
-			...JSON.parse(JSON.stringify(music_cookies.qqmusic.body)),
-			"req_0": { "module": "srf_diss_info.DissInfoServer", "method": "CgiGetDiss", "param": { "disstid": 0, "dirid": 202, "onlysonglist": 0, "song_begin": 0, "song_num": 500, "userinfo": 1, "pic_dpi": 800, "orderlist": 1 } }
-		};
-		json_body.comm.guid = md5(String(new Date().getTime()));
-		json_body.comm.uin = uin;
-		json_body.comm.tmeLoginType = 2;
-		json_body.comm.psrf_qqunionid = '';
-		json_body.comm.authst = '';
-		json_body.req_0.param.song_num = page_size;
-		json_body.req_0.param.song_begin = ((page < 1 ? 1 : page) * page_size) - page_size;
-		json_body.req_0.param.disstid = disstid;
-		json_body.req_0.param.dirid = dirid;
-
-		let options = {
-			method: 'POST',//post请求 
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: JSON.stringify(json_body)
-		};
-
-		let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-
-		if (res.code != '0' && res.req_0.code != '0') {
-			return null;
-		}
-
-		let dirinfo = res.req_0?.data?.dirinfo || {};
-		let data = res.req_0?.data?.songlist;
-		data = data ? data : [];
-		return { title: dirinfo.title, desc: dirinfo.desc, page: page, data: data };
-	} catch (err) { }
-
-	return null;
-}
-
-
-async function bilibili_search(search, page = 1, page_size = 10) {
-	try {
-		let url = `https://app.bilibili.com/x/v2/search/type`;
-		let time = parseInt(new Date().getTime() / 1000);
-		let params = {
-			access_key: '',
-			appkey: '1d8b6e7d45233436',
-			build: 7210300,
-			buvid: 'XU973E09237CC101E74F6E24CCF3DE3300D0B',
-			c_locale: 'zh_CN',
-			channel: 'xiaomi',
-			disable_rcmd: 0,
-			fnval: 16,//130
-			fnver: 0,
-			fourk: 1,
-			is_dolby: 0,
-			is_h265: 0,
-			is_proj: 1,
-			live_extra: '',
-			mobi_app: 'android',
-			mobile_access_key: '',
-			platform: 'android',
-			playurl_type: 1,
-			protocol: 1,
-			qn: 64,
-			s_locale: 'zh_CN',
-			statistics: '%7B%22appId%22%3A1%2C%22platform%22%3A3%2C%22version%22%3A%227.21.0%22%2C%22abtest%22%3A%22%22%7D',
-			sys_ver: 31,
-			ts: time,
-			video_type: 0,
-			keyword: encodeURI(search),
-			type: 10,
-			pn: page,
-			ps: page_size
-		};
-		let param = [];
-		for (let key of Object.keys(params).sort()) {
-			param.push(`${key}=${params[key]}`);
-		}
-		param = param.join("&");
-		let sign = md5(`${param}560c52ccd288fed045859ed18bffd973`);
-		param += `&sign=${sign}`;
-		let response = await fetch(`${url}?${param}`);
-		let res = await response.json();
-		if (!res.data?.items || res.data?.items.length < 1) {
-			return null;
-		}
-		return { page: page, data: res.data?.items };
-	} catch (err) { }
-	return null;
-}
-
-async function qqmusic_search(search, page = 1, page_size = 10) {
-	try {
-		let qq_search_json = {
-			"comm": { "uin": "0", "authst": "", "ct": 29 },
-			"search": {
-				"method": "DoSearchForQQMusicMobile",
-				"module": "music.search.SearchCgiService",
-				"param": {
-					"grp": 1,
-					"num_per_page": 40,
-					"page_num": 1,
-					"query": "",
-					"remoteplace": "miniapp.1109523715",
-					"search_type": 0,
-					"searchid": String(Math.floor(Math.random() * 10000000))
-				}
-			}
-		};
-
-		qq_search_json['search']['param']['query'] = search;
-		qq_search_json['search']['param']['page_num'] = page;
-		qq_search_json['search']['param']['num_per_page'] = page_size;
-
-		let options = {
-			method: 'POST',//post请求 
-			headers: {
-				'User-Agent': 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)',
-				'Content-Type': 'application/json',
-				'Cookie': Bot?.cookies?.['y.qq.com'] || Config.getConfig('music', 'cookies')?.qqmusic || ''
-			},
-			body: JSON.stringify(qq_search_json)
-		};
-
-		let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
-
-		let response = await fetch(url, options); //调用接口获取数据
-
-		let res = await response.json(); //结果json字符串转对象
-
-		if (res.code != '0') {
-			return null;
-		}
-		let body = res.search?.data?.body || {};
-		return { page: page, data: body.song?.list || body.item_song || [] };
-	} catch (err) { }
-
-	return null;
-}
-
-async function netease_search(search, page = 1, page_size = 10) {
-	try {
-		let offset = page < 1 ? 0 : page;
-		offset = (page_size * page) - page_size;
-		let url = 'http://music.163.com/api/cloudsearch/pc';
-		let options = {
-			method: 'POST',//post请求 
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				'Cookie': music_cookies.netease.ck
-			},
-			body: `offset=${offset}&limit=${page_size}&type=1&s=${encodeURI(search)}`
-		};
-
-		let response = await fetch(url, options); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-
-		if (res.result.songs < 1) {
-			return null;
-		}
-		return { page: page, data: res.result.songs };
-	} catch (err) { }
-
-	return null;
-}
-
-async function kuwo_search(search, page = 1, page_size = 10) {
-	try {
-		let url = `http://search.kuwo.cn/r.s?user=&android_id=&prod=kwplayer_ar_10.1.2.1&corp=kuwo&newver=3&vipver=10.1.2.1&source=kwplayer_ar_10.1.2.1_40.apk&p2p=1&q36=&loginUid=&loginSid=&notrace=0&client=kt&all=${search}&pn=${page - 1}&rn=${page_size}&uid=&ver=kwplayer_ar_10.1.2.1&vipver=1&show_copyright_off=1&newver=3&correct=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1&searchapi=5&issubtitle=1&province=&city=&latitude=&longtitude=&userIP=&searchNo=&spPrivilege=0`;
-		let response = await fetch(url, { method: "get" }); //调用接口获取数据
-		let res = await response.json(); //结果json字符串转对象
-		if (res.abslist.length < 1) {
-			return null;
-		}
-		return { page: page, data: res.abslist };
-	} catch (err) { }
-
-	return null;
-    
-async function get_bilibili_userinfo(ck) {
+async function get_bilibili_userinfo(ck = null) {
     try {
-        let res = await (await fetch('https://api.bilibili.com/x/web-interface/nav', { headers: { 'Cookie': ck || music_cookies.bilibili.ck } })).json();
-        if (res.code === 0 && res.data?.isLogin) return { code: 1, data: { userid: res.data.mid, nickname: res.data.uname, is_vip: res.data.vipStatus === 1 } };
-    } catch (err) {}
+        let cookie = ck || music_cookies.bilibili.ck;
+        let url = 'https://api.bilibili.com/x/web-interface/nav';
+        let options = { method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Cookie': cookie } };
+        let response = await fetch(url, options);
+        let res = await response.json();
+        if (res.code === 0 && res.data?.isLogin) {
+            let data = res.data;
+            return { code: 1, data: { userid: data.mid, nickname: data.uname, is_vip: data.vipStatus === 1 } };
+        }
+    } catch (err) { }
     return { code: -1 };
 }
 
-function getCookieMap(cookie) {
-    let map = new Map();
-    cookie.replace(/\s*/g, "").split(";").forEach(v => { let [k, val] = v.split("="); if (k) map.set(k, val); });
-    return map;
+async function get_netease_userinfo(ck = null) {
+    try {
+        let url = 'https://interface.music.163.com/api/nuser/account/get';
+        let options = { method: 'GET', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': ck || music_cookies.netease.ck } };
+        let response = await fetch(url, options);
+        let res = await response.json();
+        if (res?.code == '200' && res.profile) {
+            return { code: 1, data: { userid: res.profile.userId, nickname: res.profile.nickname, is_vip: res.account?.vipType != 0 } };
+        }
+    } catch (err) { }
+    return { code: -1 };
 }
 
-function getCookie(map) {
-    let arr = [];
-    for (let [k, v] of map) arr.push(`${k}=${v}`);
-    return arr;
+async function get_qqmusic_userinfo(ck = null) {
+    try {
+        let url = `https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?_=${new Date().getTime()}&cv=4747474&ct=24&format=json&inCharset=utf-8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0&uin=0&g_tk_new_20200303=5381&g_tk=5381&cid=205360838&userid=0&reqfrom=1&reqtype=0&hostUin=0&loginUin=0`;
+        let cookies = getCookie(ck) || getCookie(music_cookies.qqmusic.ck) || [];
+        let options = { method: 'GET', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': cookies.join('; ') } };
+        let response = await fetch(url, options);
+        let res = await response.json();
+        if (res?.code == '0' && res.data?.creator) {
+            return { code: 1, data: { userid: ck.get('uin') || ck.get('wxuin'), nickname: res.data.creator.nick, is_vip: await is_qqmusic_vip(ck.get('uin') || ck.get('wxuin'), cookies.join('; ')) } };
+        }
+    } catch (err) { }
+    return { code: -1 };
 }
 
-function random(min, max) { return min + Math.round(Math.random() * (max - min)); }
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-// ==================== 请将以下代码追加到文件最底部 ====================
+async function is_qqmusic_vip(uin, cookies = null) {
+    let json = {
+        "comm": { "cv": 4747474, "ct": 24, "format": "json", "inCharset": "utf-8", "outCharset": "utf-8", "notice": 0, "platform": "yqq.json", "needNewCode": 1, "uin": 0, "g_tk_new_20200303": 5381, "g_tk": 5381 },
+        "req_0": { "module": "userInfo.VipQueryServer", "method": "SRFVipQuery_V2", "param": { "uin_list": [uin] } }
+    };
+    let options = { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cookie': cookies || Bot?.cookies?.['y.qq.com'] }, body: JSON.stringify(json) };
+    let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
+    try {
+        let response = await fetch(url, options);
+        let res = await response.json();
+        if (res.req_0 && res.req_0?.code == '0') {
+            let data = res.req_0.data?.infoMap?.[uin];
+            if (data.iVipFlag == 1 || data.iSuperVip == 1 || data.iNewVip == 1 || data.iNewSuperVip == 1) return true;
+        }
+    } catch (err) { }
+    return false;
+}
 
 async function bilibili_search(search, page = 1, page_size = 10) {
     try {
@@ -1724,7 +1455,7 @@ async function qqmusic_search(search, page = 1, page_size = 10) {
         }
         let query_body = {
             "comm": { "uin": ck_map ? (ck_map.get('uin') || 0) : 0, "authst": ck_map ? (ck_map.get('qqmusic_key') || "") : "", "ct": 24, "cv": 4747474 },
-            "req_1": { "method": "DoSearchForQQMusicMobile", "module": "music.search.SearchCgiService", "param": { "grp": 1, "num_per_page": page_size, "page_num": page, "query": search, "search_type": 0, "userid": 0 } }
+            "req_1": { "method": "DoSearchForQQMusicMobile", "module": "music.search.SearchCgiService", "param": { "grp": 1, "num_per_page": page_size, "page_num": page, "query": search, "search_type": 0, "userid": 0, "searchid": String(Math.floor(Math.random() * 10000000)) } }
         };
         let url = `https://u.y.qq.com/cgi-bin/musicu.fcg`;
         let response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://y.qq.com/', 'Cookie': cookie_str }, body: JSON.stringify(query_body) });
@@ -1830,7 +1561,40 @@ async function qqmusic_refresh_token(cookies, type) {
     return result;
 }
 
+function getCookieMap(cookie) {
+    let cookiePattern = /^(\S+)=(\S+)$/;
+    let cookieArray = cookie.replace(/\s*/g, "").split(";");
+    let cookieMap = new Map();
+    for (let item of cookieArray) {
+        let entry = item.split("=");
+        if (!entry[0]) continue;
+        cookieMap.set(entry[0], entry[1]);
+    }
+    return cookieMap || {};
+}
+
+function getCookie(map) {
+    const cookies = [];
+    for (let key of map.keys()) {
+        let value = map.get(key);
+        if (value) {
+            cookies.push(`${key}=${value}`);
+        }
+    }
+    return cookies;
+}
+
+function random(min, max) {
+    const range = max - min;
+    const random = Math.random();
+    const result = min + Math.round(random * range);
+    return result;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 async function upload_image(file) {
     return (await Bot.pickFriend(Bot.uin)._preprocess(segment.image(file))).imgs[0];
-}
 }
