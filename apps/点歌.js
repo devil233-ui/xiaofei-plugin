@@ -1076,7 +1076,7 @@ async function music_search(e, search, source, page = 1, page_size = 10) {
             id: (data) => { return data.share?.video?.bvid; },
             artist: (data) => { return data.author.replace(/\<.*?\>/g, ''); },
             pic: (data) => { let url = data.cover || ''; if (url.indexOf('http') != 0) url = 'http:' + url; return url; },
-            link: (data) => { return data.share?.video?.short_link || `https://www.bilibili.com/video/${data.share?.video?.bvid}`; },
+            link: (data) => { let bvid = data.share?.video?.bvid || data.bvid; return bvid ? `https://www.bilibili.com/video/${bvid}` : data.share?.video?.short_link; },
             url: null, lrc: null,
             api: async (data, types, music_data = {}) => {
                 let url = `https://api.bilibili.com/x/web-interface/view?bvid=${data.share?.video?.bvid}`;
