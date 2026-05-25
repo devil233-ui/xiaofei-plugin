@@ -1,19 +1,19 @@
-import YAML from 'yaml'
-import chokidar from 'chokidar'
-import fs from 'node:fs'
-import lodash from 'lodash'
+import YAML from "yaml"
+import chokidar from "chokidar"
+import fs from "node:fs"
+import lodash from "lodash"
 
 const Path = process.cwd();
-const Plugin_Name = 'xiaofei-plugin'
+const Plugin_Name = "xiaofei-plugin"
 const Plugin_Path = `${Path}/plugins/${Plugin_Name}`;
 
 if(!Bot.xiaofei_plugin) Bot.xiaofei_plugin = {};
 
 class Config {
-	constructor () {
+	constructor() {
     this.config = {}
 	
-	Bot.xiaofei_plugin['config'] = this.config;
+	Bot.xiaofei_plugin["config"] = this.config;
 
     /** 监听文件 */
     this.watcher = {}
@@ -25,17 +25,17 @@ class Config {
    * @param app  功能
    * @param name 配置文件名称
    */
-  getdefSet (app, name) {
-    return this.getYaml(app, name, 'defSet')
+  getdefSet(app, name) {
+    return this.getYaml(app, name, "defSet")
   }
 
   /** 用户配置 */
-  getConfig (app, name) {
-	return this.getYaml(app, name, 'config')
+  getConfig(app, name) {
+	return this.getYaml(app, name, "config")
   }
 
-  saveConfig (app, name, data) {
-    return this.save(app, name, 'config',data)
+  saveConfig(app, name, data) {
+    return this.save(app, name, "config",data)
   }
 
   /**
@@ -44,7 +44,7 @@ class Config {
    * @param name 名称
    * @param type 默认跑配置-defSet，用户配置-config
    */
-  getYaml (app, name, type) {
+  getYaml(app, name, type) {
     let file = this.getFilePath(app, name, type)
     let key = `${app}.${name}`
 
@@ -52,7 +52,7 @@ class Config {
 
     try {
       this.config[type][key] = YAML.parse(
-        fs.readFileSync(file, 'utf8')
+        fs.readFileSync(file, "utf8")
       )
     } catch (error) {
       logger.error(`[小飞插件][${app}][${name}] 格式错误 ${error}`)
@@ -64,7 +64,7 @@ class Config {
     return this.config[type][key]
   }
 
-  getFilePath (app, name, type) {
+  getFilePath(app, name, type) {
 	  if(!this.config[type]){
 		  this.config[type] = {};
 	  }
@@ -85,13 +85,13 @@ class Config {
   }
 
   /** 监听配置文件 */
-  watch (file, app, name, type = 'defSet') {
+  watch(file, app, name, type = "defSet") {
     let key = `${app}.${name}`
 
     if (this.watcher[type][key]) return
 
     const watcher = chokidar.watch(file)
-    watcher.on('change', path => {
+    watcher.on("change", path => {
       delete this.config[type][key]
       logger.mark(`[小飞插件][修改配置文件][${type}][${app}][${name}]`)
       this.getYaml(app, name, type)//重新读取文件
@@ -103,13 +103,13 @@ class Config {
     this.watcher[type][key] = watcher
   }
   
-  save (app, name, type, data) {
+  save(app, name, type, data) {
 	let file = this.getFilePath(app, name, type)
     if (lodash.isEmpty(data)) {
       fs.existsSync(file) && fs.unlinkSync(file)
     } else {
       let yaml = YAML.stringify(data)
-      fs.writeFileSync(file, yaml, 'utf8')
+      fs.writeFileSync(file, yaml, "utf8")
     }
   }
   

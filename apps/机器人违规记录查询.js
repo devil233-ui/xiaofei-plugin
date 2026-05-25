@@ -1,30 +1,30 @@
 import fetch from "node-fetch";
-import common from '../../../lib/common/common.js'
+import common from "../../../lib/common/common.js"
 const login_list = {};
 export class xiaofei_violation_query extends plugin {
 	constructor() {
 		super({
 			/** 功能名称 */
-			name: '机器人违规查询',
+			name: "机器人违规查询",
 			/** 功能描述 */
-			dsc: '',
+			dsc: "",
 			/** https://oicqjs.github.io/oicq/#events */
-			event: 'message',
+			event: "message",
 			/** 优先级，数字越小等级越高 */
 			priority: 2000,
 			rule: [
 				{
 					/** 命令正则匹配 */
-					reg: '^#(机器人|bot|Bot|BOT)违规记录(查询)?(.*)?$',
+					reg: "^#(机器人|bot|Bot|BOT)违规记录(查询)?(.*)?$",
 					/** 执行方法 */
-					fnc: 'violation_query',
-					permission: 'master'
+					fnc: "violation_query",
+					permission: "master"
 				},
 				{
 					/** 命令正则匹配 */
-					reg: '^#我的违规记录(查询)?(.*)?$',
+					reg: "^#我的违规记录(查询)?(.*)?$",
 					/** 执行方法 */
-					fnc: 'violation_query',
+					fnc: "violation_query",
 				}
 			]
 		});
@@ -37,22 +37,22 @@ export class xiaofei_violation_query extends plugin {
 		reg = /^#(.*?)违规记录(查询)?(\d+)?$/.exec(e.msg) || [];
 		let num = (reg.length > 2 && reg[3]) ? parseInt(reg[3]) : 20;
 		let appid = 1109907872;
-		let uin = reg[1].includes('我的') ? e.user_id : e.self_id;
+		let uin = reg[1].includes("我的") ? e.user_id : e.self_id;
 		if (login_list[`${uin}_code`] && (Date.now() - login_list[`${uin}_code`].time) < 10 * 60 * 1000) {
 			code = login_list[`${uin}_code`].code;
 		}
 		if (!code) {
-			if (reg[1].includes('我的')) {
+			if (reg[1].includes("我的")) {
 				let options = {
-					method: 'GET',
+					method: "GET",
 					headers: {
-						'qua': 'V1_HT5_QDT_0.70.2209190_x64_0_DEV_D',
-						'host': 'q.qq.com',
-						'accept': 'application/json',
-						'content-type': 'application/json'
+						"qua": "V1_HT5_QDT_0.70.2209190_x64_0_DEV_D",
+						"host": "q.qq.com",
+						"accept": "application/json",
+						"content-type": "application/json"
 					}
 				};
-				let response = await fetch('https://q.qq.com/ide/devtoolAuth/GetLoginCode', options);
+				let response = await fetch("https://q.qq.com/ide/devtoolAuth/GetLoginCode", options);
 				let result = await response.json();
 				if (result.data && result.data.code) {
 					let login_code = result.data.code;
@@ -66,10 +66,10 @@ export class xiaofei_violation_query extends plugin {
 							delete login_list[uin];
 						}
 						login_list[uin] = time;
-						timer = setInterval(async () => {
+						timer = setInterval(async() => {
 							if (count >= 60 || login_list[uin] != time) {
 								clearInterval(timer);
-								if (count >= 60) e.reply('授权登录超时！', true);
+								if (count >= 60) e.reply("授权登录超时！", true);
 								resolve(false);
 								return;
 							}
@@ -87,19 +87,19 @@ export class xiaofei_violation_query extends plugin {
 								clearInterval(timer);
 								let ticket = data.ticket;
 								let options = {
-									method: 'POST',
+									method: "POST",
 									headers: {
-										'qua': 'V1_HT5_QDT_0.70.2209190_x64_0_DEV_D',
-										'host': 'q.qq.com',
-										'accept': 'application/json',
-										'content-type': 'application/json'
+										"qua": "V1_HT5_QDT_0.70.2209190_x64_0_DEV_D",
+										"host": "q.qq.com",
+										"accept": "application/json",
+										"content-type": "application/json"
 									},
 									body: JSON.stringify({
 										appid: appid,
 										ticket: ticket
 									})
 								};
-								let response = await fetch('https://q.qq.com/ide/login', options);
+								let response = await fetch("https://q.qq.com/ide/login", options);
 								let result = await response.json();
 								if (!result.code) {
 									e.reply(`授权登录失败！\n${result.message}`, true);
@@ -128,7 +128,7 @@ export class xiaofei_violation_query extends plugin {
 				}
 			} else {
 				if (!e.bot?.sendUni) {
-					e.reply('非 ICQQ 不支持，请使用 #我的违规记录 查询')
+					e.reply("非 ICQQ 不支持，请使用 #我的违规记录 查询")
 					return
 				}
 				code = await LightApp_GetCode(e, appid);
@@ -141,24 +141,24 @@ export class xiaofei_violation_query extends plugin {
 			}
 		}
 		if (!code) {
-			e.reply('获取code失败！', true);
+			e.reply("获取code失败！", true);
 			return;
 		}
-		let url = 'https://minico.qq.com/minico/oauth20?uin=QQ%E5%AE%89%E5%85%A8%E4%B8%AD%E5%BF%83';
+		let url = "https://minico.qq.com/minico/oauth20?uin=QQ%E5%AE%89%E5%85%A8%E4%B8%AD%E5%BF%83";
 		let options = {
-			method: 'POST',
+			method: "POST",
 			headers: {
-				'Content-Type': 'application/json'
+				"Content-Type": "application/json"
 			},
 			body: JSON.stringify({
 				code: code,
 				appid: appid,
-				platform: 'qq'
+				platform: "qq"
 			})
 		};
 		let response = await fetch(url, options);
 		let result = await response.json();
-		if (result.retcode != '0' || !result.data) {
+		if (result.retcode != "0" || !result.data) {
 			if (login_list[`${uin}_code`]) delete login_list[`${uin}_code`];
 			e.reply(`code授权登录失败[${result.retcode}]，请重试！`, true);
 		}
@@ -173,32 +173,32 @@ export class xiaofei_violation_query extends plugin {
 		};
 		param = Object.keys(param).map(key => {
 			return `${key}=${param[key]}`;
-		}).join('&');
+		}).join("&");
 		url = `https://minico.qq.com/minico/cgiproxy/v3_release/v3/getillegalityhistory?${param}`;
 		options.body = `{"com":{"src":0,"scene":1001,"platform":2,"version":"${e.bot?.apk?.version || "8.9.85.12820"}"},"pageNum":0,"pageSize":${num}}`;
 		response = await fetch(url, options);
 		result = await response.json();
-		if (result.retcode != '0' || !result.records) {
+		if (result.retcode != "0" || !result.records) {
 			e.reply(`查询失败[${result.retcode}]！`, true);
 			return;
 		}
 
 		if (result.totalSize < 1) {
-			e.reply(`${reg[1].includes('我的') ? '账号[' + uin + ']' : '本账号'}没有违规记录！`, true);
+			e.reply(`${reg[1].includes("我的") ? "账号[" + uin + "]" : "本账号"}没有违规记录！`, true);
 			return true;
 		}
 
-		let title = `${reg[1].includes('我的') ? '账号[' + uin + ']' : '本账号'}存在${result.totalSize}条历史违规记录`;
-		let MsgList = [title];
+		let title = `${reg[1].includes("我的") ? "账号[" + uin + "]" : "本账号"}存在${result.totalSize}条历史违规记录`;
+		let MsgList = [ title ];
 		let records = result.records;
 		for (let record of records) {
 			let violation_info = violation_list.find(val => {
 				return val.reason == record.reason;
 			});
-			let day = record.duration > 0 ? Math.ceil((record.duration - record.time) / 86400) + '天' : '';
-			let msg = [`冻结时间：${new Date(record.time * 1000 + 28800000).toJSON().replace('T', ' ').split('.')[0]}`];
+			let day = record.duration > 0 ? Math.ceil((record.duration - record.time) / 86400) + "天" : "";
+			let msg = [ `冻结时间：${new Date(record.time * 1000 + 28800000).toJSON().replace("T", " ").split(".")[0]}` ];
 			if(violation_info){
-				msg.push(`冻结原因：${violation_info.reasonDesc == '' ? violation_info.title : `因涉嫌${violation_info.reasonDesc}被冻结${day}。`}`);
+				msg.push(`冻结原因：${violation_info.reasonDesc == "" ? violation_info.title : `因涉嫌${violation_info.reasonDesc}被冻结${day}。`}`);
 				msg.push(`冻结详情：${violation_info.description}`);
 			}
 			msg.push(JSON.stringify(record));
@@ -214,8 +214,8 @@ export class xiaofei_violation_query extends plugin {
 async function LightApp_GetCode(e, appid) {
 	let body = {
 		1: 3,
-		2: e.bot.apk.qua == '' ? `V1_AND_SQ_${e.bot.apk.ver}_1234_YYB_D` : e.bot.apk.qua,
-		3: `i=${e.bot.device.guid.toString('hex')}&imsi=&mac=${e.bot.device.mac_address}&m=${e.bot.device.model}&o=0&a=0&sd=0&c64=1&sc=1&p=1080*2221&aid=${e.bot.device.guid.toString('hex')}&f=${e.bot.device.brand}&mm=00&cf=00&cc=00&qimei=&qimei36=&sharpP=1&n=wifi&support_xsj_live=true&client_mod=default`,
+		2: e.bot.apk.qua == "" ? `V1_AND_SQ_${e.bot.apk.ver}_1234_YYB_D` : e.bot.apk.qua,
+		3: `i=${e.bot.device.guid.toString("hex")}&imsi=&mac=${e.bot.device.mac_address}&m=${e.bot.device.model}&o=0&a=0&sd=0&c64=1&sc=1&p=1080*2221&aid=${e.bot.device.guid.toString("hex")}&f=${e.bot.device.brand}&mm=00&cf=00&cc=00&qimei=&qimei36=&sharpP=1&n=wifi&support_xsj_live=true&client_mod=default`,
 		4: {
 			1: String(appid)
 		},

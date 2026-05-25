@@ -9,9 +9,9 @@ import child_process from "child_process"
 
 var errors = {};
 
-async function uploadRecord(e, record_url, seconds = 0, transcoding = true, brief = '') {
+async function uploadRecord(e, record_url, seconds = 0, transcoding = true, brief = "") {
     if(!e.bot.sendUni) throw new Error("当前协议不支持uploadRecord上传")
-    const result = await getPttBuffer(record_url, Bot?.config?.ffmpeg_path || 'ffmpeg', transcoding);
+    const result = await getPttBuffer(record_url, Bot?.config?.ffmpeg_path || "ffmpeg", transcoding);
     if (!result.buffer) {
         return false;
     }
@@ -59,7 +59,7 @@ async function uploadRecord(e, record_url, seconds = 0, transcoding = true, brie
         "Net-Type": "Wifi"
     };
     await fetch(url, {
-        method: 'POST',//post请求 
+        method: "POST",//post请求 
         headers: headers,
         body: buf
     });
@@ -80,7 +80,7 @@ async function uploadRecord(e, record_url, seconds = 0, transcoding = true, brie
         30: {
             1: 0,//是否为变声语音
             5: 0,//是否显示评级
-            6: 'sss',//评级
+            6: "sss",//评级
             7: 0,//未知参数
             8: brief
         }
@@ -100,7 +100,7 @@ async function getPttBuffer(file, ffmpeg = "ffmpeg", transcoding = true) {
         const buf = file instanceof Buffer ? file : Buffer.from(file.slice(9), "base64");
         const head = buf.slice(0, 7).toString();
         if (head.includes("SILK") || head.includes("AMR") || !transcoding) {
-            const tmpfile = TMP_DIR + '/' + (0, uuid)();
+            const tmpfile = TMP_DIR + "/" + (0, uuid)();
             await fs.promises.writeFile(tmpfile, buf);
             let result = await getAudioTime(tmpfile, ffmpeg);
             if (result.code == 1) time = result.data;
@@ -108,7 +108,7 @@ async function getPttBuffer(file, ffmpeg = "ffmpeg", transcoding = true) {
             fs.unlink(tmpfile, NOOP);
             buffer = result.buffer || buf;
         } else {
-            const tmpfile = TMP_DIR + '/' + (0, uuid)();
+            const tmpfile = TMP_DIR + "/" + (0, uuid)();
             let result = await getAudioTime(tmpfile, ffmpeg);
             if (result.code == 1) time = result.data;
             await fs.promises.writeFile(tmpfile, buf);
@@ -121,14 +121,14 @@ async function getPttBuffer(file, ffmpeg = "ffmpeg", transcoding = true) {
         //const readable = (await axios.get(file, { responseType: "stream" })).data;
         try {
             const headers = {
-                "User-Agent": `Dalvik/2.1.0 (Linux; U; Android 12; MI 9 Build/SKQ1.211230.001)`,
+                "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 12; MI 9 Build/SKQ1.211230.001)",
             };
             let response = await fetch(file, {
-                method: 'GET',//post请求 
+                method: "GET",//post请求 
                 headers: headers
             });
             const buf = Buffer.from(await response.arrayBuffer());
-            const tmpfile = TMP_DIR + '/' + (0, uuid)();
+            const tmpfile = TMP_DIR + "/" + (0, uuid)();
             await fs.promises.writeFile(tmpfile, buf);
             //await (0, pipeline)(readable.pipe(new DownloadTransform), fs.createWriteStream(tmpfile));
             const head = await read7Bytes(tmpfile);
@@ -163,19 +163,19 @@ async function getAudioTime(file, ffmpeg = "ffmpeg") {
         let file_info = fs.statSync(file);
         let cmd = `${ffmpeg} -i "${file}"`;
         let is_aac = false;
-        if (file_info['size'] >= 10485760) {
+        if (file_info["size"] >= 10485760) {
             cmd = `${ffmpeg} -i "${file}" -fs 10485600 -ab 128k "${file}.mp3"`;
             is_aac = true;
         }
-        (0, child_process.exec)(cmd, async (error, stdout, stderr) => {
+        (0, child_process.exec)(cmd, async(error, stdout, stderr) => {
             try {
                 let buffer = null;
                 if (is_aac) {
                     buffer = fs.readFileSync(`${file}.mp3`);
                     fs.unlinkSync(`${file}.mp3`);
                 }
-                let time = stderr.split('Duration:')[1]?.split(',')[0].trim();
-                let arr = time?.split(':');
+                let time = stderr.split("Duration:")[1]?.split(",")[0].trim();
+                let arr = time?.split(":");
                 arr.reverse();
                 let n = 1;
                 let s = 0;
@@ -201,8 +201,8 @@ async function getAudioTime(file, ffmpeg = "ffmpeg") {
 
 async function audioTrans(file, ffmpeg = "ffmpeg") {
     let result = await new Promise((resolve, reject) => {
-        const tmpfile = TMP_DIR + '/' + (0, uuid)() + '.pcm';
-        (0, child_process.exec)(`${ffmpeg} -y -i "${file}" -f s16le -ar 24000 -ac 1 -fs 31457280 "${tmpfile}"`, async (error, stdout, stderr) => {
+        const tmpfile = TMP_DIR + "/" + (0, uuid)() + ".pcm";
+        (0, child_process.exec)(`${ffmpeg} -y -i "${file}" -f s16le -ar 24000 -ac 1 -fs 31457280 "${tmpfile}"`, async(error, stdout, stderr) => {
             try {
                 const silk_worker = await import("./silk_worker/index.cjs");
                 let ret = await silk_worker.encode(tmpfile, 24000);
@@ -223,8 +223,8 @@ async function audioTrans(file, ffmpeg = "ffmpeg") {
 
 async function audioTrans1(file, ffmpeg = "ffmpeg") {
     return new Promise((resolve, reject) => {
-        const tmpfile = TMP_DIR + '/' + (0, uuid)();
-        (0, child_process.exec)(`${ffmpeg} -y -i "${file}" -ac 1 -ar 8000 -f amr "${tmpfile}"`, async (error, stdout, stderr) => {
+        const tmpfile = TMP_DIR + "/" + (0, uuid)();
+        (0, child_process.exec)(`${ffmpeg} -y -i "${file}" -ac 1 -ar 8000 -f amr "${tmpfile}"`, async(error, stdout, stderr) => {
             try {
                 const amr = await fs.promises.readFile(tmpfile);
                 resolve(amr);
@@ -271,7 +271,7 @@ function fileHash(filepath) {
             .on("error", reject)
             .on("data", resolve));
     });
-    return Promise.all([md5Stream(readable), sha]);
+    return Promise.all([ md5Stream(readable), sha ]);
 }
 
 /** 群号转uin */
@@ -339,7 +339,7 @@ function parseFunString(buf) {
         try {
             let arr = core.pb.decode(buf)[1];
             if (!Array.isArray(arr))
-                arr = [arr];
+                arr = [ arr ];
             for (let v of arr) {
                 if (v[2])
                     res += String(v[2]);
@@ -355,7 +355,7 @@ function parseFunString(buf) {
 
 /** xml转义 */
 function escapeXml(str) {
-    return str.replace(/[&"><]/g, function (s) {
+    return str.replace(/[&"><]/g, function(s) {
         if (s === "&")
             return "&amp;";
         if (s === "<")
@@ -401,7 +401,7 @@ const md5 = (data) => (0, crypto.createHash)("md5").update(data).digest();
 
 errors.LoginErrorCode = errors.drop = errors.ErrorCode = void 0;
 var ErrorCode;
-(function (ErrorCode) {
+(function(ErrorCode) {
     /** 客户端离线 */
     ErrorCode[ErrorCode["ClientNotOnline"] = -1] = "ClientNotOnline";
     /** 发包超时未收到服务器回应 */
@@ -456,7 +456,7 @@ function drop(code, message) {
 errors.drop = drop;
 /** 登录时可能出现的错误，不在列的都属于未知错误，暂时无法解决 */
 var LoginErrorCode;
-(function (LoginErrorCode) {
+(function(LoginErrorCode) {
     /** 密码错误 */
     LoginErrorCode[LoginErrorCode["WrongPassword"] = 1] = "WrongPassword";
     /** 账号被冻结 */

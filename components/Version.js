@@ -1,12 +1,12 @@
-import fs from 'fs'
-import lodash from 'lodash'
+import fs from "fs"
+import lodash from "lodash"
 const Plugin_Path = `${process.cwd()}/plugins/xiaofei-plugin`;
 const README_path = `${Plugin_Path}/README.md`
 const CHANGELOG_path = `${Plugin_Path}/CHANGELOG.md`
-let yunzai_ver = '';
+let yunzai_ver = "";
 let packageJson
 try{
-  packageJson = JSON.parse(fs.readFileSync(`${process.cwd()}/package.json`, 'utf8'));
+  packageJson = JSON.parse(fs.readFileSync(`${process.cwd()}/package.json`, "utf8"));
   yunzai_ver = packageJson.version;
 }catch(err){}
 
@@ -15,20 +15,20 @@ let changelogs = []
 let currentVersion
 let versionCount = 10
 
-const getLine = function (line) {
-  line = line.replace(/(^\s*\*|\r)/g, '')
-  line = line.replace(/\s*`([^`]+`)/g, '<span class="cmd">$1')
-  line = line.replace(/`\s*/g, '</span>')
-  line = line.replace(/\s*\*\*([^\*]+\*\*)/g, '<span class="strong">$1')
-  line = line.replace(/\*\*\s*/g, '</span>')
-  line = line.replace(/ⁿᵉʷ/g, '<span class="new"></span>')
+const getLine = function(line) {
+  line = line.replace(/(^\s*\*|\r)/g, "")
+  line = line.replace(/\s*`([^`]+`)/g, "<span class=\"cmd\">$1")
+  line = line.replace(/`\s*/g, "</span>")
+  line = line.replace(/\s*\*\*([^\*]+\*\*)/g, "<span class=\"strong\">$1")
+  line = line.replace(/\*\*\s*/g, "</span>")
+  line = line.replace(/ⁿᵉʷ/g, "<span class=\"new\"></span>")
   return line
 }
 
 try {
   if (fs.existsSync(CHANGELOG_path)) {
-    logs = fs.readFileSync(CHANGELOG_path, 'utf8') || ''
-	logs = logs.replace(/\t/g,'   ').split('\n')
+    logs = fs.readFileSync(CHANGELOG_path, "utf8") || ""
+	logs = logs.replace(/\t/g,"   ").split("\n")
     let temp = {};
     let lastLine = {}
     lodash.forEach(logs, (line) => {
@@ -82,7 +82,7 @@ try {
 
 try{
 	if(fs.existsSync(README_path)){
-		let README = fs.readFileSync(README_path, 'utf8') || ''
+		let README = fs.readFileSync(README_path, "utf8") || ""
 		let reg = /版本：(.*)/.exec(README)
 		if(reg){
 			currentVersion = reg[1]
@@ -92,20 +92,20 @@ try{
 
 const isMiao = packageJson.dependencies.sequelize ? true : false
 const isTrss = Array.isArray(Bot.uin) ? true : false
-let BotName = 'Yunzai-Bot'
-if (packageJson.name === 'miao-yunzai') {
-  BotName = 'Miao-Yunzai'
-} else if (packageJson.name === 'trss-yunzai') {
-  BotName = 'TRSS-Yunzai'
+let BotName = "Yunzai-Bot"
+if (packageJson.name === "miao-yunzai") {
+  BotName = "Miao-Yunzai"
+} else if (packageJson.name === "trss-yunzai") {
+  BotName = "TRSS-Yunzai"
 } else {
-  BotName = 'Yunzai-Bot'
+  BotName = "Yunzai-Bot"
 }
 
 let Version = {
   isMiao,
   isTrss,
   BotName,
-  get ver () {
+  get ver() {
     return currentVersion;
   },
   get yunzai(){

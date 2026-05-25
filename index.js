@@ -2,9 +2,9 @@
 /**
 插件更新地址：https://gitee.com/xfdown/xiaofei-plugin
 */
-import YAML from 'yaml';
-import fs from 'node:fs';
-import { Version, Plugin_Path } from './components/index.js';
+import YAML from "yaml";
+import fs from "node:fs";
+import { Version, Plugin_Path } from "./components/index.js";
 
 const apps = {};
 global.xiaofei_plugin = {
@@ -15,7 +15,7 @@ global.xiaofei_plugin = {
 let is_icqq = false;
 let is_oicq = false;
 
-const __dirname = process.cwd().replace(/\\/g, '/') + '/plugins/ICQQ-Plugin'
+const __dirname = process.cwd().replace(/\\/g, "/") + "/plugins/ICQQ-Plugin"
 
 try {
   let icqq = await import("icqq");
@@ -30,7 +30,7 @@ try {
 if (is_icqq || is_oicq) {
   if (!global.core) {
     if (Version.isTrss) {
-      const dirs = ["Model", "node_modules"].map(i => `${__dirname}/${i}/icqq/`).filter(fs.existsSync);
+      const dirs = [ "Model", "node_modules" ].map(i => `${__dirname}/${i}/icqq/`).filter(fs.existsSync);
       for (const dir of dirs) {
         try {
           const { core } = (await import(`file://${dir}lib/index.js`)).default;
@@ -41,22 +41,22 @@ if (is_icqq || is_oicq) {
         }
       }
     } else {
-      global.core = (await import(is_icqq ? 'icqq' : 'oicq')).core;
+      global.core = (await import(is_icqq ? "icqq" : "oicq")).core;
     }
   }
-  if (!global.segment) global.segment = (await import(is_icqq ? 'icqq' : 'oicq')).segment;
+  if (!global.segment) global.segment = (await import(is_icqq ? "icqq" : "oicq")).segment;
 }
 
 if (fs.existsSync("./renderers/puppeteer/lib/puppeteer.js")) {
   try {
-    let configFile = `./renderers/puppeteer/config.yaml`;
+    let configFile = "./renderers/puppeteer/config.yaml";
     let rendererCfg = {};
     if (!fs.existsSync(configFile)) {
-      configFile = `./renderers/puppeteer/config_default.yaml`;
+      configFile = "./renderers/puppeteer/config_default.yaml";
     }
 
     try {
-      rendererCfg = YAML.parse(fs.readFileSync(configFile, 'utf8'));
+      rendererCfg = YAML.parse(fs.readFileSync(configFile, "utf8"));
     } catch (e) {
       rendererCfg = {};
     }
@@ -75,7 +75,7 @@ if (!xiaofei_plugin.puppeteer) {
   }
 }
 
-const files = fs.readdirSync(`${Plugin_Path}/apps`).filter(file => file.endsWith('.js'))
+const files = fs.readdirSync(`${Plugin_Path}/apps`).filter(file => file.endsWith(".js"))
 
 let ret = []
 
@@ -86,12 +86,12 @@ files.forEach((file) => {
 ret = await Promise.allSettled(ret)
 let ver = Version.ver;
 
-logger.info(`---------^_^---------`)
+logger.info("---------^_^---------")
 logger.info(`小飞插件${ver}：初始化~`)
 
   for (let i in files) {
-    let name = files[i].replace('.js', '')
-    if (ret[i].status != 'fulfilled') {
+    let name = files[i].replace(".js", "")
+    if (ret[i].status != "fulfilled") {
       logger.error(`【${logger.red(name)}】模块载入失败！`)
       logger.error(ret[i].reason)
       continue
@@ -100,5 +100,5 @@ logger.info(`小飞插件${ver}：初始化~`)
     apps[name] = ret[i].value[Object.keys(ret[i].value)[0]]
   }
   logger.info(`小飞插件${ver}：初始化完成！`)
-logger.info(`---------------------`)
+logger.info("---------------------")
 export { apps }

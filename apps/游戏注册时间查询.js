@@ -1,14 +1,14 @@
-﻿import lodash from 'lodash';
-import fetch from 'node-fetch';
-import fs from 'node:fs';
-import { Plugin_Path } from '../components/index.js';
+import lodash from "lodash";
+import fetch from "node-fetch";
+import fs from "node:fs";
+import { Plugin_Path } from "../components/index.js";
 
 // 动态导入账号配置模块
 let accountManager;
 try {
-	accountManager = await import('../../genshin/model/gsCfg.js');
+	accountManager = await import("../../genshin/model/gsCfg.js");
 } catch {
-	accountManager = await import('../../genshin/model/gsCfg');
+	accountManager = await import("../../genshin/model/gsCfg");
 }
 
 // ==================== 常量与配置 ====================
@@ -31,29 +31,29 @@ const GAME_META = {
 		isGlobal: (region) => region.includes('prod_official') && !region.includes('prod_gf_cn'),
 	},
 	zzz: {
-		name: '绝区零',
-		bizCN: 'nap_cn',
-		bizGlobal: 'nap_global',
-		serverList: ['prod_gf_cn', 'prod_gf_cn', 'prod_gf_us', 'prod_gf_eu', 'prod_gf_jp', 'prod_gf_sg'],
+		name: "绝区零",
+		bizCN: "nap_cn",
+		bizGlobal: "nap_global",
+		serverList: [ "prod_gf_cn", "prod_gf_cn", "prod_gf_us", "prod_gf_eu", "prod_gf_jp", "prod_gf_sg" ],
 		regionNameFilter: () => true, // 不过滤
-		isGlobal: (region) => !region.includes('prod_gf_cn'),
+		isGlobal: (region) => !region.includes("prod_gf_cn"),
 	},
 };
 
 /** API 端点基础地址 */
 const API_BASE = {
-	CN: 'https://api-takumi.mihoyo.com',
-	Global: 'https://sg-public-api.hoyoverse.com',
-	gsCN: 'https://hk4e-api.mihoyo.com',
-	gsGlobal: 'https://sg-hk4e-api.hoyoverse.com',
+	CN: "https://api-takumi.mihoyo.com",
+	Global: "https://sg-public-api.hoyoverse.com",
+	gsCN: "https://hk4e-api.mihoyo.com",
+	gsGlobal: "https://sg-hk4e-api.hoyoverse.com",
 };
 
 /** 活动接口配置 */
 const ACTIVITY_APIS = {
-	gsRegisterTime: '/event/e20240928anniversary/data',
-	srRegisterTime: '/event/e20260426anniversary/data',
-	zzzRegisterTime: '/event/e20250606anniversary/data',
-	srArtSetRemain: '/event/e20260410artset/index',
+	gsRegisterTime: "/event/e20240928anniversary/data",
+	srRegisterTime: "/event/e20260426anniversary/data",
+	zzzRegisterTime: "/event/e20250606anniversary/data",
+	srArtSetRemain: "/event/e20260410artset/index",
 };
 
 // ==================== 通用工具函数 ====================
@@ -65,23 +65,23 @@ function inferServerRegion(uid, gameKey) {
 	const gameMeta = GAME_META[gameKey];
 	const serverList = gameMeta.serverList;
 
-	if (gameKey === 'zzz') {
+	if (gameKey === "zzz") {
 		if (uidStr.length < 10) return serverList[0];
 		switch (uidStr.slice(0, -8)) {
-			case '10': return serverList[2];
-			case '15': return serverList[3];
-			case '13': return serverList[4];
-			case '17': return serverList[5];
+			case "10": return serverList[2];
+			case "15": return serverList[3];
+			case "13": return serverList[4];
+			case "17": return serverList[5];
 			default: return serverList[0];
 		}
 	} else {
 		switch (uidStr.slice(0, -8)) {
-			case '5': return serverList[1];
-			case '6': return serverList[2];
-			case '7': return serverList[3];
-			case '8':
-			case '18': return serverList[4];
-			case '9': return serverList[5];
+			case "5": return serverList[1];
+			case "6": return serverList[2];
+			case "7": return serverList[3];
+			case "8":
+			case "18": return serverList[4];
+			case "9": return serverList[5];
 			default: return serverList[0];
 		}
 	}
@@ -109,9 +109,9 @@ function formatTimestamp(timestamp) {
 	const year = date.getFullYear();
 	const month = date.getMonth() + 1;
 	const day = date.getDate();
-	const hours = date.getHours().toString().padStart(2, '0');
-	const minutes = date.getMinutes().toString().padStart(2, '0');
-	const seconds = date.getSeconds().toString().padStart(2, '0');
+	const hours = date.getHours().toString().padStart(2, "0");
+	const minutes = date.getMinutes().toString().padStart(2, "0");
+	const seconds = date.getSeconds().toString().padStart(2, "0");
 	return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
 }
 
@@ -129,20 +129,20 @@ function getCurrentTimeString() {
 function extractSetCookies(response) {
 	const cookies = [];
 	// node-fetch v2 提供 headers.raw()
-	if (typeof response.headers.raw === 'function') {
+	if (typeof response.headers.raw === "function") {
 		const raw = response.headers.raw();
-		if (raw['set-cookie']) {
-			raw['set-cookie'].forEach(c => cookies.push(c.split(';')[0]));
+		if (raw["set-cookie"]) {
+			raw["set-cookie"].forEach(c => cookies.push(c.split(";")[0]));
 		}
 	} else {
 		// node-fetch v3 和原生 fetch 使用 headers.forEach
 		response.headers.forEach((value, key) => {
-			if (key.toLowerCase() === 'set-cookie') {
-				cookies.push(value.split(';')[0]);
+			if (key.toLowerCase() === "set-cookie") {
+				cookies.push(value.split(";")[0]);
 			}
 		});
 	}
-	return cookies.filter(c => c.includes('='));
+	return cookies.filter(c => c.includes("="));
 }
 
 // ==================== 账号与 Cookie 管理 ====================
@@ -163,7 +163,7 @@ async function getUserBoundCookies(e, gameKey) {
 	if (e.user && lodash.isEmpty(boundCookies)) {
 		const userObj = e.user;
 		if (!userObj.hasCk) {
-			return { code: -2, msg: '请先绑定Cookie！\r\n发送【ck帮助】查看配置教程' };
+			return { code: -2, msg: "请先绑定Cookie！\r\n发送【ck帮助】查看配置教程" };
 		}
 		const uidList = userObj.getCkUidList(gameKey) || [];
 		const mysUsers = userObj.mysUsers || {};
@@ -177,7 +177,7 @@ async function getUserBoundCookies(e, gameKey) {
 		}
 	} else {
 		if (lodash.isEmpty(boundCookies)) {
-			return { code: -2, msg: '请先绑定Cookie！\r\n发送【ck帮助】查看配置教程' };
+			return { code: -2, msg: "请先绑定Cookie！\r\n发送【ck帮助】查看配置教程" };
 		}
 		const filterFunc = GAME_META[gameKey].regionNameFilter;
 		for (const uid in boundCookies) {
@@ -189,9 +189,9 @@ async function getUserBoundCookies(e, gameKey) {
 	}
 
 	if (cookieList.length === 0) {
-		return { code: -1, msg: '获取Cookie失败！' };
+		return { code: -1, msg: "获取Cookie失败！" };
 	}
-	return { code: 1, msg: '获取成功！', data: cookieList };
+	return { code: 1, msg: "获取成功！", data: cookieList };
 }
 
 // ==================== 米哈游通行证登录 ====================
@@ -207,22 +207,22 @@ async function performBadgeLogin(account, uid, gameKey) {
 
 	const requestBody = {
 		game_biz: gameBiz,
-		lang: 'zh-cn',
+		lang: "zh-cn",
 		region: region,
 		uid: String(uid),
 	};
 
 	let cookies = [];
 	let code = -1;
-	let message = '';
+	let message = "";
 	let responseData = null;
 
 	try {
 		const response = await fetch(`${apiBase}/common/badge/v1/login/account`, {
-			method: 'POST',
+			method: "POST",
 			headers: {
-				'Content-Type': 'application/json',
-				Cookie: account.ck || '',
+				"Content-Type": "application/json",
+				"Cookie": account.ck || "",
 			},
 			body: JSON.stringify(requestBody),
 		});
@@ -247,7 +247,7 @@ async function performBadgeLogin(account, uid, gameKey) {
  * 获取注册时间缓存文件路径
  */
 function getRegisterTimeCachePath(userId, gameKey) {
-	const dirName = gameKey === 'gs' ? 'ys' : gameKey;
+	const dirName = gameKey === "gs" ? "ys" : gameKey;
 	return `${Plugin_Path}/data/${dirName}_RegTime/${userId}.json`;
 }
 
@@ -257,7 +257,7 @@ function getRegisterTimeCachePath(userId, gameKey) {
 function readRegisterTimeCache(filePath, uid) {
 	try {
 		if (fs.existsSync(filePath)) {
-			const cache = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+			const cache = JSON.parse(fs.readFileSync(filePath, "utf8"));
 			return cache[uid] || null;
 		}
 	} catch (err) {
@@ -273,14 +273,14 @@ function writeRegisterTimeCache(filePath, uid, data) {
 	try {
 		let cache = {};
 		if (fs.existsSync(filePath)) {
-			cache = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+			cache = JSON.parse(fs.readFileSync(filePath, "utf8"));
 		}
 		cache[uid] = data;
-		const dir = filePath.substring(0, filePath.lastIndexOf('/'));
+		const dir = filePath.substring(0, filePath.lastIndexOf("/"));
 		if (!fs.existsSync(dir)) {
 			fs.mkdirSync(dir, { recursive: true });
 		}
-		fs.writeFileSync(filePath, JSON.stringify(cache), 'utf8');
+		fs.writeFileSync(filePath, JSON.stringify(cache), "utf8");
 	} catch (err) {
 		// 忽略写入错误
 	}
@@ -292,22 +292,22 @@ function writeRegisterTimeCache(filePath, uid, data) {
 async function fetchRegisterTimeRawData(uid, gameKey, loginResult) {
 	const region = loginResult.userInfo.region;
 	const apiBase = getApiBaseUrl(region, gameKey);
-	const cookieHeader = loginResult.cookies.join('; ');
+	const cookieHeader = loginResult.cookies.join("; ");
 	const options = { headers: { Cookie: cookieHeader } };
 
 	let url;
 	switch (gameKey) {
-		case 'gs':
+		case "gs":
 			url = `${apiBase}${ACTIVITY_APIS.gsRegisterTime}?badge_uid=${uid}&badge_region=${region}&game_biz=${loginResult.userInfo.game_biz}&lang=zh-cn`;
 			break;
-		case 'sr':
+		case "sr":
 			url = `${apiBase}${ACTIVITY_APIS.srRegisterTime}?badge_uid=${uid}&badge_region=${region}&game_biz=${loginResult.userInfo.game_biz}&lang=zh-cn&plat=2`;
 			break;
-		case 'zzz':
+		case "zzz":
 			url = `${apiBase}${ACTIVITY_APIS.zzzRegisterTime}?badge_uid=${uid}&badge_region=${region}&game_biz=${loginResult.userInfo.game_biz}&lang=zh-cn`;
 			break;
 		default:
-			return { code: -1, msg: '未知游戏' };
+			return { code: -1, msg: "未知游戏" };
 	}
 
 	const response = await fetch(url, options);
@@ -316,12 +316,12 @@ async function fetchRegisterTimeRawData(uid, gameKey, loginResult) {
 	});
 
 	if (res.retcode !== 0) {
-		return { code: -1, msg: res.message || '接口返回错误' };
+		return { code: -1, msg: res.message || "接口返回错误" };
 	}
 
 	// 提取原始数据
 	let rawData;
-	if (gameKey === 'gs') {
+	if (gameKey === "gs") {
 		rawData = res.data?.data;
 	} else {
 		rawData = res.data?.raw_data ? JSON.parse(res.data.raw_data) : {};
@@ -339,24 +339,24 @@ async function fetchRegisterTimeRawData(uid, gameKey, loginResult) {
  * 从原始数据中解析注册时间
  */
 function extractRegisterTime(rawData, gameKey) {
-	if (gameKey === 'gs') {
-		const dataObj = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-		const timestamp = dataObj['1'] || dataObj['1-1-1'];
-		return timestamp > 0 ? formatTimestamp(timestamp * 1000) : (timestamp || '查询失败！');
-	} else if (gameKey === 'sr') {
-		const date = rawData['1-1'] || rawData['th_1_1_1'];
+	if (gameKey === "gs") {
+		const dataObj = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
+		const timestamp = dataObj["1"] || dataObj["1-1-1"];
+		return timestamp > 0 ? formatTimestamp(timestamp * 1000) : (timestamp || "查询失败！");
+	} else if (gameKey === "sr") {
+		const date = rawData["1-1"] || rawData["th_1_1_1"];
 		if (date) {
 			return date;
 		} else if (rawData.data?.list) {
 			const list = rawData.data?.list || [];
-			const item = list.find(v => v.key === 'register_date');
-			return item?.value || '查询失败！';
+			const item = list.find(v => v.key === "register_date");
+			return item?.value || "查询失败！";
 		}
-	} else if (gameKey === 'zzz') {
-		const timestamp = rawData['1'];
-		return timestamp > 0 ? formatTimestamp(timestamp * 1000) : (timestamp || '查询失败！');
+	} else if (gameKey === "zzz") {
+		const timestamp = rawData["1"];
+		return timestamp > 0 ? formatTimestamp(timestamp * 1000) : (timestamp || "查询失败！");
 	}
-	return '查询失败！';
+	return "查询失败！";
 }
 
 /**
@@ -365,17 +365,17 @@ function extractRegisterTime(rawData, gameKey) {
 async function getRegisterTimeWithCache(e, account, uid, gameKey) {
 	const cachePath = getRegisterTimeCachePath(e.user_id, gameKey);
 	let cached = readRegisterTimeCache(cachePath, uid);
-	const shouldRefresh = e.msg.includes('刷新') || !cached;
+	const shouldRefresh = e.msg.includes("刷新") || !cached;
 
 	if (!shouldRefresh) {
-		if (gameKey === 'gs' && cached?.game_data?.data?.data) cached.game_data = cached.game_data.data.data;
+		if (gameKey === "gs" && cached?.game_data?.data?.data) cached.game_data = cached.game_data.data.data;
 		return { code: 1, ...cached };
 	}
 
 	// 登录
 	const loginRes = await performBadgeLogin(account, uid, gameKey);
 	if (loginRes.code !== 0) {
-		return { code: -1, msg: loginRes.message || '登录失败' };
+		return { code: -1, msg: loginRes.message || "登录失败" };
 	}
 
 	// 获取数据
@@ -400,7 +400,7 @@ async function getRegisterTimeWithCache(e, account, uid, gameKey) {
 async function buildRegisterTimeReply(e, account, uid, gameKey) {
 	const result = await getRegisterTimeWithCache(e, account, uid, gameKey);
 	if (result.code !== 1) {
-		return `uid：${uid}\r\n注册时间：${result.msg || '查询失败'}`;
+		return `uid：${uid}\r\n注册时间：${result.msg || "查询失败"}`;
 	}
 
 	const user = result.info_data;
@@ -419,15 +419,15 @@ async function buildRegisterTimeReply(e, account, uid, gameKey) {
  */
 async function fetchArtSetRemainData(uid, loginResult) {
 	const region = loginResult.userInfo.region;
-	const apiBase = getApiBaseUrl(region, 'sr');
-	const cookieHeader = loginResult.cookies.join('; ');
+	const apiBase = getApiBaseUrl(region, "sr");
+	const cookieHeader = loginResult.cookies.join("; ");
 	const url = `${apiBase}${ACTIVITY_APIS.srArtSetRemain}?channel=1&view_source=3&lang=zh-cn&badge_uid=${uid}&badge_region=${region}&game_biz=hkrpg_cn`;
 
 	const response = await fetch(url, { headers: { Cookie: cookieHeader } });
 	const res = await response.json();
 
 	if (res.retcode !== 0) {
-		return { code: -1, msg: res.message || '接口返回错误' };
+		return { code: -1, msg: res.message || "接口返回错误" };
 	}
 	return { code: 1, data: res.data };
 }
@@ -447,18 +447,18 @@ function buildArtSetRemainText(inventoryInfo) {
 export class xiaofei_RegisterTimeQuery extends plugin {
 	constructor() {
 		super({
-			name: '小飞插件_游戏注册时间查询',
-			dsc: '查询原神/星铁/绝区零注册时间',
-			event: 'message',
+			name: "小飞插件_游戏注册时间查询",
+			dsc: "查询原神/星铁/绝区零注册时间",
+			event: "message",
 			priority: 2000,
 			rule: [
 				{
-					reg: '^(#|\\*|\\%)?(星铁|绝区零)?(刷新)?(我的)?(原神|星铁|绝区零)?注册时间$',
-					fnc: 'handleRegisterTimeQuery',
+					reg: "^(#|\\*|\\%)?(星铁|绝区零)?(刷新)?(我的)?(原神|星铁|绝区零)?注册时间$",
+					fnc: "handleRegisterTimeQuery",
 				},
 				{
-					reg: '^(#|\\*|\\%)?(星铁)?纪念册$',
-					fnc: 'handleArtSetRemainQuery',
+					reg: "^(#|\\*|\\%)?(星铁)?纪念册$",
+					fnc: "handleArtSetRemainQuery",
 				},
 			],
 		});
@@ -469,9 +469,9 @@ export class xiaofei_RegisterTimeQuery extends plugin {
 	 */
 	async handleRegisterTimeQuery() {
 		// 解析游戏类型
-		let gameKey = 'gs';
-		if (this.e.msg.includes('*') || this.e.msg.includes('铁')) gameKey = 'sr';
-		else if (this.e.msg.includes('%') || this.e.msg.includes('零')) gameKey = 'zzz';
+		let gameKey = "gs";
+		if (this.e.msg.includes("*") || this.e.msg.includes("铁")) gameKey = "sr";
+		else if (this.e.msg.includes("%") || this.e.msg.includes("零")) gameKey = "zzz";
 
 		const gameName = GAME_META[gameKey].name;
 
@@ -489,7 +489,7 @@ export class xiaofei_RegisterTimeQuery extends plugin {
 			replyLines.push(line);
 		}
 
-		const finalReply = `---${gameName}注册时间---\r\n${replyLines.join('\r\n----------------\r\n')}\r\n----------------\r\n提示：如需更新数据，请发送【#刷新${gameName}注册时间】`;
+		const finalReply = `---${gameName}注册时间---\r\n${replyLines.join("\r\n----------------\r\n")}\r\n----------------\r\n提示：如需更新数据，请发送【#刷新${gameName}注册时间】`;
 		await this.e.reply(finalReply);
 		return true;
 	}
@@ -498,7 +498,7 @@ export class xiaofei_RegisterTimeQuery extends plugin {
 	 * 处理纪念册剩余数量查询命令
 	 */
 	async handleArtSetRemainQuery() {
-		const gameKey = 'sr';
+		const gameKey = "sr";
 		const gameName = GAME_META[gameKey].name;
 
 		const cookiesResult = await getUserBoundCookies(this.e, gameKey);
@@ -537,7 +537,7 @@ export class xiaofei_RegisterTimeQuery extends plugin {
 			replyLines.push("获取数据失败");
 		}
 
-		const finalReply = `---${gameName}纪念册剩余---\n${replyLines.join('\n----------------\n')}`;
+		const finalReply = `---${gameName}纪念册剩余---\n${replyLines.join("\n----------------\n")}`;
 		await this.e.reply(finalReply);
 		return true;
 	}

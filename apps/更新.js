@@ -1,40 +1,40 @@
-import { execSync } from 'child_process'
-import { Version, Common, Plugin_Name } from '../components/index.js'
+import { execSync } from "child_process"
+import { Version, Common, Plugin_Name } from "../components/index.js"
 let update;
 try{
-	update = (await import('../../other/update.js'))?.update;
+	update = (await import("../../other/update.js"))?.update;
 }catch{}
 
 export class xiaofei_update extends plugin {
 	constructor() {
 		super({
 			/** 功能名称 */
-			name: '小飞插件_更新',
+			name: "小飞插件_更新",
 			/** 功能描述 */
-			dsc: '调用Yunzai自带更新模块进行插件更新',
+			dsc: "调用Yunzai自带更新模块进行插件更新",
 			/** https://oicqjs.github.io/oicq/#events */
-			event: 'message',
+			event: "message",
 			/** 优先级，数字越小等级越高 */
 			priority: 2000,
 			rule: [
 				{
 					/** 命令正则匹配 */
-					reg: '^#?小飞(插件)?(强制)?更新$',
+					reg: "^#?小飞(插件)?(强制)?更新$",
 					/** 执行方法 */
-					fnc: 'update_plugin',
-					permission: 'master'
+					fnc: "update_plugin",
+					permission: "master"
 				},
 				{
 					/** 命令正则匹配 */
-					reg: '^#?小飞(插件)?版本$',
+					reg: "^#?小飞(插件)?版本$",
 					/** 执行方法 */
-					fnc: 'plugin_version',
+					fnc: "plugin_version",
 				},
 				{
 					/** 命令正则匹配 */
-					reg: '^#?小飞(插件)?更新日志$',
+					reg: "^#?小飞(插件)?更新日志$",
 					/** 执行方法 */
-					fnc: 'update_log',
+					fnc: "update_log",
 				},
 			]
 		});
@@ -42,7 +42,7 @@ export class xiaofei_update extends plugin {
 
 	async update_plugin() {
 		if(!update){
-			this.e.msg = `#${this.e.msg.includes('强制') ? '强制' : ''}更新xiaofei-plugin`;
+			this.e.msg = `#${this.e.msg.includes("强制") ? "强制" : ""}更新xiaofei-plugin`;
 			return false;
 		}
 		let Update_Plugin = new update();
@@ -50,8 +50,8 @@ export class xiaofei_update extends plugin {
 		Update_Plugin.reply = this.reply;
 
 		if (Update_Plugin.getPlugin(Plugin_Name)) {
-			if (this.e.msg.includes('强制')) {
-				await execSync('git reset --hard', { cwd: `${process.cwd()}/plugins/${Plugin_Name}/` });
+			if (this.e.msg.includes("强制")) {
+				await execSync("git reset --hard", { cwd: `${process.cwd()}/plugins/${Plugin_Name}/` });
 			}
 			await Update_Plugin.runUpdate(Plugin_Name);
 			if (Update_Plugin.isUp) {
@@ -68,7 +68,7 @@ export class xiaofei_update extends plugin {
 
 	async update_log() {
 		if(!update){
-			this.e.msg = `#更新日志xiaofei-plugin`;
+			this.e.msg = "#更新日志xiaofei-plugin";
 			return false;
 		}
 		let Update_Plugin = new update();
@@ -83,9 +83,9 @@ export class xiaofei_update extends plugin {
 }
 
 async function versionInfo(e) {
-	return await Common.render('help/version-info', {
+	return await Common.render("help/version-info", {
 		currentVersion: Version.ver,
 		changelogs: Version.logs,
-		elem: 'cryo'
+		elem: "cryo"
 	}, { e, scale: 1.2 })
 }
