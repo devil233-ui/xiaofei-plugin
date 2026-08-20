@@ -1225,11 +1225,71 @@ async function CreateMusicShare(e, data) {
     let url = typeof data.link == "function" ? await data.link(data.data) : data.link;
     Object.assign(data, { url: audio, pic: image, link: url });
     if (e.bot?.adapter?.name?.includes("OneBot")) {
-        return { type: "music", data: data.source == "netease" ? { type: "163", id: data.id } : { type: "custom", url, audio, title: data.name, image, content: data.artist } };
+        return { type: "music", data: { type: "custom", url, audio, title: data.name, image, content: data.artist } };
     }
     const apps = { bilibili: [ 100951776, "tv.danmaku.bili", "7194d531cbe7960a22007b9f6bdaa38b" ], netease: [ 100495085, "com.netease.cloudmusic", "da6b069da1e2982db3e386233f68d76d" ], kuwo: [ 100243533, "cn.kuwo.player", "bf9ff4ffb4c558a34ee3fd52c223ebf5" ], kugou: [ 205141, "com.kugou.android", "fe4a24d80fcf253a00676a808f62c2c6" ], qq: [ 100497308, "com.tencent.qqmusic", "cbd27cd7c861227d013a25b2d10f0799" ] };
     let [ appid, appname, appsign ] = apps[data.source] || apps.qq;
     return { 1: appid, 2: 1, 3: audio ? 4 : 0, 5: { 1: 1, 2: "0.0.0", 3: appname, 4: appsign }, 10: e.isGroup ? 1 : 0, 11: e.isGroup ? e.group.gid : (e.friend?.uin || e.user_id), 12: { 10: data.name, 11: data.artist, 12: `[分享]${data.name}`, 13: url, 14: image, 16: audio } };
+}
+
+const MUSIC_REPLY_RECONNECT_TIMEOUT = 10000;
+const MUSIC_REPLY_RECONNECT_INTERVAL = 250;
+
+function isOneBotMusicEvent(e) {
+    return e.bot?.adapter === "OneBotv11" || e.bot?.adapter?.name === "OneBotv11";
+}
+
+function getMusicReplyFailure(result) {
+    if (!result || typeof result !== "object") return null;
+    if (result.error) return result.error;
+    if (result.status === "failed") return result;
+    if (result.retcode != null && ![ 0, 1 ].includes(Number(result.retcode))) return result;
+    return null;
+}
+
+function describeMusicReplyFailure(result) {
+    const failure = Array.isArray(result?.error) ? result.error[0] : result?.error || result;
+    return failure?.message || failure?.wording || result?.message || result?.wording || String(failure);
+}
+
+async function waitForCurrentOneBot(e) {
+    const botId = String(e.self_id || e.bot?.uin || "");
+    const deadline = Date.now() + MUSIC_REPLY_RECONNECT_TIMEOUT;
+    while (botId && Date.now() < deadline) {
+        const bot = globalThis.Bot?.[botId];
+        if (bot?.ws?.readyState === 1) return bot;
+        await new Promise(resolve => setTimeout(resolve, MUSIC_REPLY_RECONNECT_INTERVAL));
+    }
+    return null;
+}
+
+function quoteMusicReply(e, message) {
+    if (!e.message_id) return message;
+    const reply = segment.reply(e.message_id);
+    return Array.isArray(message) ? [ reply, ...message ] : [ reply, message ];
+}
+
+async function sendMusicReply(e, message, quote = false, options = {}) {
+    if (!isOneBotMusicEvent(e)) return await e.reply(message, quote, options);
+
+    const bot = await waitForCurrentOneBot(e);
+    if (!bot) return { error: [ new Error("OneBot 重连等待超时") ] };
+
+    let target;
+    try {
+        target = e.group_id != null ? bot.pickGroup(e.group_id) : bot.pickFriend(e.user_id);
+        if (!target?.sendMsg) throw new Error("OneBot 找不到消息目标");
+        const result = await target.sendMsg(quote ? quoteMusicReply(e, message) : message);
+        if (options.recallMsg > 0 && result?.message_id && target.recallMsg) {
+            setTimeout(() => {
+                Promise.resolve(target.recallMsg(result.message_id)).catch(() => {});
+                if (e.message_id) Promise.resolve(target.recallMsg(e.message_id)).catch(() => {});
+            }, options.recallMsg * 1000);
+        }
+        return result;
+    } catch (error) {
+        return { error: [ error ] };
+    }
 }
 
 async function SendMusicShare(e, body, music) {
@@ -1240,10 +1300,11 @@ async function SendMusicShare(e, body, music) {
     let sendSuccess = false;
 
     try {
-        if (e.bot?.adapter === "OneBotv11" || e.bot?.adapter?.name === "OneBotv11") {
+        if (isOneBotMusicEvent(e)) {
             try {
                 let ret = await e.reply(body);
-                if (ret && (ret.status === "failed" || ret.retcode !== 0)) throw new Error("SF");
+                const failure = getMusicReplyFailure(ret);
+                if (failure) throw new Error(describeMusicReplyFailure(ret));
                 sendSuccess = true;
             } catch (err) {
                 sendSuccess = false;
@@ -1265,10 +1326,12 @@ async function SendMusicShare(e, body, music) {
     try {
         // 【完美分离逻辑】
         // 1. 发物理兜底链接，不撤回
-        await e.reply(`卡片发送失败，已提取备用链接：\n━━━━━━━━━━━━\n歌名：${music.name}\n歌手：${music.artist}\n链接：${music.link || music.url}`);
+        let result = await sendMusicReply(e, `卡片发送失败，已提取备用链接：\n━━━━━━━━━━━━\n歌名：${music.name}\n歌手：${music.artist}\n链接：${music.link || music.url}`);
+        if (getMusicReplyFailure(result)) logger.error(`[小飞点歌] 备用链接发送失败: ${describeMusicReplyFailure(result)}`);
 
         // 2. 发防傻等提示，撤回
-        await e.reply("正在尝试转为语音模式(可能需1-3分钟)，请稍候...", true, { recallMsg: 45 });
+        result = await sendMusicReply(e, "正在尝试转为语音模式(可能需1-3分钟)，请稍候...", true, { recallMsg: 45 });
+        if (getMusicReplyFailure(result)) logger.error(`[小飞点歌] 语音转换提示发送失败: ${describeMusicReplyFailure(result)}`);
 
         let msgRes;
         let useUploadRecord = false;
@@ -1288,14 +1351,15 @@ async function SendMusicShare(e, body, music) {
         }
 
         if (msgRes) {
-            try {
-                await e.reply(msgRes);
-            } catch (replyErr) {
-                logger.error(`[小飞点歌] 兜底语音发送超时或崩溃: ${replyErr}`);
-                await e.reply("⚠️ 语音生成/发送超时失败！文件可能过大，请直接点击上方链接收听。");
+            result = await sendMusicReply(e, msgRes);
+            if (getMusicReplyFailure(result)) {
+                logger.error(`[小飞点歌] 兜底语音发送超时或崩溃: ${describeMusicReplyFailure(result)}`);
+                const notice = await sendMusicReply(e, "⚠️ 语音生成/发送超时失败！文件可能过大，请直接点击上方链接收听。");
+                if (getMusicReplyFailure(notice)) logger.error(`[小飞点歌] 语音失败提示发送失败: ${describeMusicReplyFailure(notice)}`);
             }
         } else {
-            await e.reply("⚠️ 语音生成失败，请点击上方链接收听。");
+            result = await sendMusicReply(e, "⚠️ 语音生成失败，请点击上方链接收听。");
+            if (getMusicReplyFailure(result)) logger.error(`[小飞点歌] 语音生成失败提示发送失败: ${describeMusicReplyFailure(result)}`);
         }
     } catch (err) { 
         logger.error(`[小飞点歌] 兜底语音整体逻辑异常: ${err}`);
