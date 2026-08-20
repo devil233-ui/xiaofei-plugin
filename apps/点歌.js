@@ -1252,6 +1252,37 @@ function describeMusicReplyFailure(result) {
     return failure?.message || failure?.wording || result?.message || result?.wording || String(failure);
 }
 
+function getMusicReplyFailureText(value, depth = 0) {
+    if (value == null || depth > 3) return "";
+    if (typeof value == "string") return value;
+    if (Array.isArray(value)) return value.map(item => getMusicReplyFailureText(item, depth + 1)).join(" ");
+    if (typeof value != "object") return String(value);
+    return [ value.message, value.wording, value.error, value.data ]
+        .map(item => getMusicReplyFailureText(item, depth + 1))
+        .filter(Boolean)
+        .join(" ");
+}
+
+function isOneBotMusicCardParseFailure(result, error) {
+    const text = [ getMusicReplyFailureText(result), getMusicReplyFailureText(error) ].join(" ");
+    return /消息体无法解析|不支持的消息类型|retcode\s*[:=]?\s*1200/i.test(text);
+}
+
+function getOneBotMusicCompatibilityTitle(title) {
+    const value = String(title || "").trim();
+    if (!/[\u3400-\u9fff]/u.test(value)) return "";
+    const match = value.match(/^[\u3400-\u9fff][\u3400-\u9fff0-9·'’\-]*/u);
+    const primary = (match?.[0] || value.split(/\s+/u)[0])
+        .replace(/[（(）)]$/u, "")
+        .trim();
+    return primary && primary != value ? primary : "";
+}
+
+function makeOneBotMusicTitleBody(body, title) {
+    if (!title || body?.type != "music" || !body.data || typeof body.data != "object") return null;
+    return { ...body, data: { ...body.data, title } };
+}
+
 async function waitForCurrentOneBot(e) {
     const botId = String(e.self_id || e.bot?.uin || "");
     const deadline = Date.now() + MUSIC_REPLY_RECONNECT_TIMEOUT;
@@ -1301,13 +1332,30 @@ async function SendMusicShare(e, body, music) {
 
     try {
         if (isOneBotMusicEvent(e)) {
+            let cardResult;
+            let cardError;
             try {
-                let ret = await e.reply(body);
-                const failure = getMusicReplyFailure(ret);
-                if (failure) throw new Error(describeMusicReplyFailure(ret));
+                cardResult = await e.reply(body);
+                const failure = getMusicReplyFailure(cardResult);
+                if (failure) throw new Error(describeMusicReplyFailure(cardResult));
                 sendSuccess = true;
-            } catch (err) {
-                sendSuccess = false;
+            } catch (error) {
+                cardError = error;
+                if (isOneBotMusicCardParseFailure(cardResult, cardError)) {
+                    const compatibilityTitle = getOneBotMusicCompatibilityTitle(body?.data?.title);
+                    const compatibilityBody = makeOneBotMusicTitleBody(body, compatibilityTitle);
+                    if (compatibilityBody) {
+                        logger.warn("[小飞点歌] OneBot 音乐卡片原标题解析失败，重试兼容标题：" + compatibilityTitle);
+                        try {
+                            cardResult = await e.reply(compatibilityBody);
+                            const failure = getMusicReplyFailure(cardResult);
+                            if (!failure) sendSuccess = true;
+                            else logger.error("[小飞点歌] OneBot 兼容标题发送失败: " + describeMusicReplyFailure(cardResult));
+                        } catch (compatibilityError) {
+                            logger.error("[小飞点歌] OneBot 兼容标题发送异常: " + compatibilityError);
+                        }
+                    }
+                }
             }
         } else if (e.bot.sendOidb) {
             let payload = await e.bot.sendOidb("OidbSvc.0xb77_9", core.pb.encode(body));

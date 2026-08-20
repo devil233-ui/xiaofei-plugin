@@ -76,11 +76,12 @@ if (!xiaofei_plugin.puppeteer) {
 }
 
 const files = fs.readdirSync(`${Plugin_Path}/apps`).filter(file => file.endsWith(".js"))
+const appImportVersion = Date.now()
 
 let ret = []
 
 files.forEach((file) => {
-  ret.push(import(`./apps/${file}`))
+  ret.push(import(`./apps/${file}?v=${appImportVersion}`))
 })
 
 ret = await Promise.allSettled(ret)
