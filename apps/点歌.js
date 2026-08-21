@@ -1225,7 +1225,7 @@ async function CreateMusicShare(e, data) {
     let url = typeof data.link == "function" ? await data.link(data.data) : data.link;
     Object.assign(data, { url: audio, pic: image, link: url });
     if (e.bot?.adapter?.name?.includes("OneBot")) {
-        return { type: "music", data: { type: "custom", url, audio, title: data.name, image, singer: data.artist, content: data.artist } };
+        return { type: "music", data: { type: "custom", url, audio, title: data.name, image, content: data.artist } };
     }
     const apps = { bilibili: [ 100951776, "tv.danmaku.bili", "7194d531cbe7960a22007b9f6bdaa38b" ], netease: [ 100495085, "com.netease.cloudmusic", "da6b069da1e2982db3e386233f68d76d" ], kuwo: [ 100243533, "cn.kuwo.player", "bf9ff4ffb4c558a34ee3fd52c223ebf5" ], kugou: [ 205141, "com.kugou.android", "fe4a24d80fcf253a00676a808f62c2c6" ], qq: [ 100497308, "com.tencent.qqmusic", "cbd27cd7c861227d013a25b2d10f0799" ] };
     let [ appid, appname, appsign ] = apps[data.source] || apps.qq;
@@ -1278,9 +1278,13 @@ function getOneBotMusicCompatibilityTitle(title) {
     return primary && primary != value ? primary : "";
 }
 
-function makeOneBotMusicTitleBody(body, title) {
-    if (!title || body?.type != "music" || !body.data || typeof body.data != "object") return null;
-    return { ...body, data: { ...body.data, title } };
+function makeOneBotMusicCompatibilityBody(body, title) {
+    if (body?.type != "music" || !body.data || typeof body.data != "object") return null;
+    const data = { ...body.data };
+    delete data.singer;
+    if (title) data.title = title;
+    if (data.title == body.data.title && data.singer == body.data.singer) return null;
+    return { ...body, data };
 }
 
 async function waitForCurrentOneBot(e) {
@@ -1343,9 +1347,9 @@ async function SendMusicShare(e, body, music) {
                 cardError = error;
                 if (isOneBotMusicCardParseFailure(cardResult, cardError)) {
                     const compatibilityTitle = getOneBotMusicCompatibilityTitle(body?.data?.title);
-                    const compatibilityBody = makeOneBotMusicTitleBody(body, compatibilityTitle);
+                    const compatibilityBody = makeOneBotMusicCompatibilityBody(body, compatibilityTitle);
                     if (compatibilityBody) {
-                        logger.warn("[小飞点歌] OneBot 音乐卡片原标题解析失败，重试兼容标题：" + compatibilityTitle);
+                        logger.warn("[小飞点歌] OneBot 音乐卡片参数解析失败，重试兼容字段：" + (compatibilityTitle || body?.data?.title || "当前标题"));
                         try {
                             cardResult = await e.reply(compatibilityBody);
                             const failure = getMusicReplyFailure(cardResult);
