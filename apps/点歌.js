@@ -1225,7 +1225,8 @@ async function CreateMusicShare(e, data) {
     let url = typeof data.link == "function" ? await data.link(data.data) : data.link;
     Object.assign(data, { url: audio, pic: image, link: url });
     if (e.bot?.adapter?.name?.includes("OneBot")) {
-        return { type: "music", data: { type: "custom", url, audio, title: data.name, image, content: data.artist } };
+        const oneBotType = data.source == "netease" ? "163" : "qq";
+        return { type: "music", data: { type: oneBotType, url, audio, title: data.name, image, content: data.artist } };
     }
     const apps = { bilibili: [ 100951776, "tv.danmaku.bili", "7194d531cbe7960a22007b9f6bdaa38b" ], netease: [ 100495085, "com.netease.cloudmusic", "da6b069da1e2982db3e386233f68d76d" ], kuwo: [ 100243533, "cn.kuwo.player", "bf9ff4ffb4c558a34ee3fd52c223ebf5" ], kugou: [ 205141, "com.kugou.android", "fe4a24d80fcf253a00676a808f62c2c6" ], qq: [ 100497308, "com.tencent.qqmusic", "cbd27cd7c861227d013a25b2d10f0799" ] };
     let [ appid, appname, appsign ] = apps[data.source] || apps.qq;
