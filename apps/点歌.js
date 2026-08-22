@@ -1235,6 +1235,7 @@ async function CreateMusicShare(e, data) {
 
 const MUSIC_REPLY_RECONNECT_TIMEOUT = 10000;
 const MUSIC_REPLY_RECONNECT_INTERVAL = 250;
+const MUSIC_CARD_COMPATIBILITY_RETRY_MAX_LATENCY = 20000;
 
 function isOneBotMusicEvent(e) {
     return e.bot?.adapter === "OneBotv11" || e.bot?.adapter?.name === "OneBotv11";
@@ -1339,25 +1340,31 @@ async function SendMusicShare(e, body, music) {
         if (isOneBotMusicEvent(e)) {
             let cardResult;
             let cardError;
+            const cardStartedAt = Date.now();
             try {
                 cardResult = await e.reply(body);
                 const failure = getMusicReplyFailure(cardResult);
                 if (failure) throw new Error(describeMusicReplyFailure(cardResult));
                 sendSuccess = true;
             } catch (error) {
+                const cardLatency = Date.now() - cardStartedAt;
                 cardError = error;
                 if (isOneBotMusicCardParseFailure(cardResult, cardError)) {
                     const compatibilityTitle = getOneBotMusicCompatibilityTitle(body?.data?.title);
                     const compatibilityBody = makeOneBotMusicCompatibilityBody(body, compatibilityTitle);
                     if (compatibilityBody) {
-                        logger.warn("[小飞点歌] OneBot 音乐卡片参数解析失败，重试兼容字段：" + (compatibilityTitle || body?.data?.title || "当前标题"));
-                        try {
-                            cardResult = await e.reply(compatibilityBody);
-                            const failure = getMusicReplyFailure(cardResult);
-                            if (!failure) sendSuccess = true;
-                            else logger.error("[小飞点歌] OneBot 兼容标题发送失败: " + describeMusicReplyFailure(cardResult));
-                        } catch (compatibilityError) {
-                            logger.error("[小飞点歌] OneBot 兼容标题发送异常: " + compatibilityError);
+                        if (cardLatency <= MUSIC_CARD_COMPATIBILITY_RETRY_MAX_LATENCY) {
+                            logger.warn("[小飞点歌] OneBot 音乐卡片参数解析失败，重试兼容字段：" + (compatibilityTitle || body?.data?.title || "当前标题"));
+                            try {
+                                cardResult = await e.reply(compatibilityBody);
+                                const failure = getMusicReplyFailure(cardResult);
+                                if (!failure) sendSuccess = true;
+                                else logger.error("[小飞点歌] OneBot 兼容标题发送失败: " + describeMusicReplyFailure(cardResult));
+                            } catch (compatibilityError) {
+                                logger.error("[小飞点歌] OneBot 兼容标题发送异常: " + compatibilityError);
+                            }
+                        } else {
+                            logger.warn(`[小飞点歌] OneBot 音乐卡片失败耗时 ${cardLatency}ms，跳过兼容重试，直接发送备用链接`);
                         }
                     }
                 }
