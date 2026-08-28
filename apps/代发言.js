@@ -76,7 +76,7 @@ export class xiaofei_replace extends plugin {
 				message_type: e.message_type,
 				msg_id: e.msg_id,
 				nt: e.nt,
-				original_msg: msg,
+				original_msg: msg?.replace(/^#?\*+/, "#星铁"),
 				post_type: e.post_type,
 				rand: e.rand,
 				raw_message: msg,
