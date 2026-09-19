@@ -116,7 +116,7 @@ var music_cookies = {
     }
 };
 
-const music_reg = "^#?(小飞)?(" + Object.keys(music_source).join("|") + "|多选)?(" + Object.keys(music_source).join("|") + "|多选)?(点播音乐|点播|点歌|播放|放一?首|来一?首|下一页|个性电台|每日推荐|每日30首|日推|我的收藏|我喜欢的歌)(.*)$";
+const music_reg = "^#?(小飞)?(" + Object.keys(music_source).join("|") + "|多选)?(" + Object.keys(music_source).join("|") + "|多选)?(点播音乐|点歌|来一?首|下一页|个性电台|每日推荐|每日30首|日推|我的收藏|我喜欢的歌)(.*)$";
 
 export class xiaofei_music extends plugin {
     constructor() {
